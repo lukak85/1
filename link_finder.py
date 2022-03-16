@@ -11,7 +11,7 @@ class LinkFinder(HTMLParser):
 
     # check the tag
     def handle_starttag(self, tag, attrs):
-        if tag == 'a':
+        if tag == 'a' or tag == 'link':
             for (attribute, value) in attrs:
                 if attribute == 'href':
                     # if the url is relative, not complete it adds the prefix
