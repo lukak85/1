@@ -1,12 +1,18 @@
+from distutils.log import error
 from http.client import ImproperConnectionState
+from os import access
+import queue
 from urllib.request import urlopen
+import time
+from xml import dom
 
 from mm import *
 from domain import *
 from database import *
 from link_finder import LinkFinder
 
-import time
+import urllib
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import re
@@ -43,29 +49,79 @@ class Crawler:
 
         Crawler.CHROME_OPTIONS = Options()
         Crawler.CHROME_OPTIONS.add_argument("user-agent=" + Crawler.PROJECT_NAME)
+        Crawler.CHROME_OPTIONS.add_argument("--headless") # This will make the browser not open
+        Crawler.CHROME_OPTIONS.add_experimental_option('excludeSwitches', ['enable-logging']) # Exclude "unimportant" error
 
         Crawler.DRIVER = webdriver.Chrome(Crawler.WEB_DRIVER_LOCATION, options=Crawler.CHROME_OPTIONS)
 
-        Crawler.boot()
-        Crawler.crawl_page(list(Crawler.queue)[0])
-
-    @staticmethod
-    def boot():
         Crawler.queue = file_to_set(Crawler.QUEUE_FILE)
 
     @staticmethod
+    def boot():
+        Crawler.crawl_page(list(Crawler.queue)[0])
+
+    @staticmethod
     def crawl_page(page_url):
-        if Crawler.url_is_in_database(page_url):
+        # If queue is empty, end crawling
+        if not queue:
+            Crawler.DRIVER.close()
+
+        # Else do the usual stuff
+        if not Crawler.url_is_in_database(page_url):
             print('Now crawling '+ page_url)
             print('Queue: '+ str(len(Crawler.queue)))
 
-            Crawler.add_links_to_queue(Crawler.gather_links(page_url))
-            Crawler.queue.remove(page_url)
+            accessedTime = datetime.now().isoformat()
+            gatheredLinksSet, html, html_bytes = Crawler.gather_links(page_url)
+
+
+            # Check if it's the proper format, if not, it's a relative link
+            gatheredLinksList = list(gatheredLinksSet)
+            for i in range(0, len(gatheredLinksList)):
+                if not re.search("http*.", gatheredLinksList[i]):
+                    if gatheredLinksList[i][0] == "/":
+                        gatheredLinksList[i] = page_url + gatheredLinksList[i]
+                    else:
+                        gatheredLinksList[i] = page_url + "/" + gatheredLinksList[i]
+            
+            gatheredLinksSet = set(gatheredLinksList)
+
+            Crawler.add_links_to_queue(gatheredLinksSet)
+
+            # --------------------------------------------------------
+            # Here is the necceseary stuff for inserting all the
+            # necceseary data into the database
+            # --------------------------------------------------------
+
+            # Get information about the site
+            domain = extract_domain(page_url)
+            print(domain)
+            site_id = find_site(domain)
+
+            if site_id == -1:
+                robots_content = Crawler.get_robots_content(domain)
+                sitemap = Crawler.get_sitemap_content(page_url)
+                
+                site_id = insert_site(domain, robots_content, sitemap)
 
             # Insert page into the database
-            insert_page(page_url)
 
-            Crawler.update_files()
+            # TODO fix this to accomodate different page types
+            insert_page(site_id, 'HTML', page_url, html, -1, accessedTime)
+
+            # TODO - all the other data
+            # Also reorder some methods
+
+
+            # --------------------------------------------------------
+
+            # Update frontier after we finished crawling the webpage.
+            # Uncomment this when we'll run the crawler for final
+            # results:
+            # Crawler.update_files()
+
+            # Remove the link at the very end, in case something went wrong
+            Crawler.queue.remove(page_url)
 
     # Downloader using selenium, in case the response doesn't render properly otherwise
     @staticmethod
@@ -74,13 +130,48 @@ class Crawler:
 
         time.sleep(Crawler.TIMEOUT)
         html = Crawler.DRIVER.page_source
-        Crawler.DRIVER.close()
         
         return html
 
     @staticmethod
+    def get_robots_content(domain):
+        # Remove \n from the sting because that posed a problem
+        domain += "/robots.txt"
+
+        html = ''
+
+        try:
+            request = urllib.request.Request(
+                domain, 
+                headers={'User-Agent': Crawler.PROJECT_NAME}
+            )
+
+            with urllib.request.urlopen(request) as response: 
+                html = response.read().decode("utf-8")
+        except:
+            print("Not able to retrieve robots.txt")
+
+        return html
+
+    @staticmethod
+    def get_sitemap_content(domain):
+        domain += "/sitemap.xml" # TODO fix this, it may not reside at this domain
+
+        content = []
+
+        try:
+            sitemap_links, _, _ = Crawler.gather_links(domain)
+            content = list(sitemap_links)
+        except:
+            print("Not able to retrieve sitemap.xml")
+
+        return ", ".join(content)
+
+    @staticmethod
     def gather_links(page_url):
         html_string = ''
+
+        print(page_url)
 
         try:
             response = urlopen(page_url)
@@ -93,13 +184,13 @@ class Crawler:
 
                 # Get HTML using 
                 html_string = Crawler.download_and_render_page(page_url)
-            finder = LinkFinder(Crawler.base_url, page_url)
+            finder = LinkFinder(extract_domain(page_url), page_url)
             finder.feed(html_string)
         except Exception as e:
             print(str(e))
-            return set()
+            return [], '' , None
 
-        return finder.page_links()
+        return finder.page_links(), html_string, html_bytes
 
     @staticmethod
     def url_is_in_database(url):
@@ -117,7 +208,7 @@ class Crawler:
             # Check if the link resides in an allowed domain
             isDomainAllowed = False
             for allowed_domain in Crawler.ALLOWED_DOMAINS:
-                if re.search(allowed_domain, get_domain_name(url)):
+                if re.search(allowed_domain, extract_domain(url)):
                     isDomainAllowed = True
             if not isDomainAllowed:
                 continue

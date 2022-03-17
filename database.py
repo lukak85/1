@@ -9,10 +9,10 @@ def insert_site(domain, robots_content, sitemap_content):
     conn.autocommit = True
     
     cur = conn.cursor()
-    cur.execute("INSERT INTO crawldb.site (domain, robots_content, sitemap_content) VALUES ('"
-                + domain + "','"
-                + robots_content + "','"
-                + sitemap_content + "' RETURNING id);")
+    cur.execute(
+        "INSERT INTO crawldb.site (domain, robots_content, sitemap_content) VALUES (%s,%s,%s) RETURNING id;",
+        (domain, robots_content, sitemap_content)
+        )
     
     id = cur.fetchone()[0]
     
@@ -32,6 +32,7 @@ def find_site(domain):
     site_id = -1
     
     # Check if array is empty, meaning we didn't find the site already present in the table
+    print(cur.fetchall())
     if cur.fetchall():
         site_id = cur.fetchone()[0]
     
@@ -52,11 +53,11 @@ def insert_image(page_id, filename, content_type, data, accessed_time):
     
     cur = conn.cursor()
     cur.execute("INSERT INTO crawldb.image (page_id, filename, content_type, data, accessed_time) VALUES (FOREIGN KEY REFERENCES crawldb.page"
-                + page_id + "),'"
+                + str(page_id) + "),'"
                 + filename + "','"
                 + content_type + "','"
-                + data + "','"
-                + accessed_time + "');")
+                + data + "',"
+                + str(accessed_time) + ");")
     
     id = cur.fetchone()[0]
     
@@ -95,12 +96,10 @@ def insert_page(site_id, page_type_code, url, html_content, http_status_code, ac
     conn.autocommit = True
     
     cur = conn.cursor()
-    cur.execute("INSERT INTO crawldb.page (site_id, page_type_code, url, html_content, http_status_code, accessed_time) VALUES (FOREIGN KEY REFERENCES crawldb.site"
-                + site_id + "),"
-                + page_type_code + ",'"
-                + html_content + "',"
-                + http_status_code + ","
-                + accessed_time + ");")
+    cur.execute(
+        "INSERT INTO crawldb.page (site_id, page_type_code, url, html_content, http_status_code, accessed_time) VALUES ((SELECT id FROM crawldb.site WHERE id=%s),%s,(SELECT code FROM crawldb.page_type WHERE code=%s),%s,%s,%s);",
+        (site_id, page_type_code, url, html_content, http_status_code, accessed_time)
+    )
     
     cur.close()
     conn.close()

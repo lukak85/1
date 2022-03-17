@@ -11,6 +11,10 @@ docker run --name postgresql-wier -e POSTGRES_PASSWORD=SecretPassword -e POSTGRE
 
 Then, run the `database.sql` script to intialize the crawldb database with all the necceseary tables and relations.
 
+To check container's logs, run `docker logs -f postgresql-wier`.
+
+To log into the database and execute SQL statements, run the following command: `docker exec -it postgresql-wier psql -U user`.
+
 ## Running the crawler
 
 In order to run the crawler, simply run the `main.py` file.
