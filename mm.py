@@ -1,12 +1,12 @@
 import os
 
-# each website is separate project
+# Each website is separate project
 def create_project_dir(directory):
     if not os.path.exists(directory):
         print('Creating project '+ directory)
         os.makedirs(directory)
 
-# create queue and crawled files
+# Create queue and crawled files
 def create_queue_file(project_name, starting_pages):
     queue_file = project_name + '/frontier.txt'
     
@@ -19,7 +19,7 @@ def create_queue_file(project_name, starting_pages):
     else:
         return file_to_array(queue_file)
     
-# create new file    
+# Create new file    
 def write_file(path, data):
     f = open(path, 'w')
 

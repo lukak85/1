@@ -14,11 +14,14 @@ def insert_site(domain, robots_content, sitemap_content):
         (domain, robots_content, sitemap_content)
         )
     
-    id = cur.fetchone()[0]
+    site_id = -1
+    result = cur.fetchall()
+    if result:
+        site_id = result[0][0]
     
     cur.close()
     conn.close()
-    return id
+    return site_id
 
 
 
@@ -29,13 +32,12 @@ def find_site(domain):
     cur = conn.cursor()
     cur.execute("SELECT * FROM crawldb.site WHERE domain='" + domain + "';")
     
-    site_id = -1
-    
     # Check if array is empty, meaning we didn't find the site already present in the table
-    print(cur.fetchall())
-    if cur.fetchall():
-        site_id = cur.fetchone()[0]
-    
+    site_id = -1
+    result = cur.fetchall()
+    if result:
+        site_id = result[0][0]
+
     cur.close()
     conn.close()
     
@@ -97,13 +99,18 @@ def insert_page(site_id, page_type_code, url, html_content, http_status_code, ac
     
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO crawldb.page (site_id, page_type_code, url, html_content, http_status_code, accessed_time) VALUES ((SELECT id FROM crawldb.site WHERE id=%s),%s,(SELECT code FROM crawldb.page_type WHERE code=%s),%s,%s,%s);",
+        "INSERT INTO crawldb.page (site_id, page_type_code, url, html_content, http_status_code, accessed_time) VALUES ((SELECT id FROM crawldb.site WHERE id=%s),(SELECT code FROM crawldb.page_type WHERE code=%s),%s,%s,%s,%s) RETURNING id;",
         (site_id, page_type_code, url, html_content, http_status_code, accessed_time)
     )
+
+    page_id = -1
+    result = cur.fetchall()
+    if result:
+        page_id = result[0][0]
     
     cur.close()
     conn.close()
-    return True
+    return page_id
 
 
 
@@ -114,11 +121,11 @@ def find_page(url):
     cur = conn.cursor()
     cur.execute("SELECT * FROM crawldb.page WHERE url='" + url + "';")
     
-    page_id = -1
-    
     # Check if array is empty, meaning the site isn't already present in the table
-    if cur.fetchall():
-        page_id = cur.fetchone()[0]
+    page_id = -1
+    result = cur.fetchall()
+    if result:
+        page_id = result[0][0]
     
     cur.close()
     conn.close()
@@ -173,9 +180,10 @@ def insert_link(from_page, to_page):
     conn.autocommit = True
     
     cur = conn.cursor()
-    cur.execute("INSERT INTO crawldb.link (page_id, data_type_code, data) VALUES (FOREIGN KEY REFERENCES crawldb.page("
-                + from_page + "),FOREIGN KEY REFERENCES crawldb.page("
-                + to_page + "));")
+    try:
+        cur.execute("INSERT INTO crawldb.link (from_page, to_page) VALUES ((SELECT id FROM crawldb.page WHERE id=%s), (SELECT id FROM crawldb.page WHERE id=%s));", (from_page, to_page))
+    except:
+        print("insert_link: one of the pages does not exist in the database")
     
     cur.close()
     conn.close()
