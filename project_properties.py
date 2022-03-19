@@ -9,7 +9,7 @@ TIMEOUT = 5
 
 NUMBER_OF_WORKERS = 4
 
-DEBUG_MODE = False # Use this to print out more than usual to debug
+DEBUG_MODE = True # Use this to print out more than usual to debug
 PROD_MODE = False # Use this to save queue to file
 
 # Crawler database properties

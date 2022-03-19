@@ -180,8 +180,10 @@ class CrawlerDatabase:
         try:
             cur.execute("INSERT INTO crawldb.link (from_page, to_page) VALUES ((SELECT id FROM crawldb.page WHERE id=%s), (SELECT id FROM crawldb.page WHERE id=%s));", (from_page, to_page))
         except:
+            """
             if DEBUG_MODE:
                 print("insert_link: one of the pages does not exist in the database")
+            """
         
         cur.close()
         conn.close()
@@ -295,57 +297,90 @@ class CrawlerDatabase:
     # IP MANAGEMENT
     # -------------
 
-    def insert_ip(self, ip, accessedTime):
+    def insert_ip(self, ip, domain, accessedTime):
         conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
         conn.autocommit = True
         
+        isNotAlreadyPresent = False
         cur = conn.cursor()
         try:
             cur.execute(
-                "INSERT INTO crawldb.ips (ip,accessedTime) VALUES (%s,%s));",
-                (ip, accessedTime)
+                "INSERT INTO crawldb.ips (ip, domain_name, accessed_time_sec) VALUES (%s,%s,%s);",
+                (ip, domain, accessedTime)
             )
+            if DEBUG_MODE:
+                print("New IP and domain combination inserted")
         except:
-            print("The url already exist in the frontier")
+            if DEBUG_MODE:
+                print("The IP and domain combination already exist")
         
         cur.close()
         conn.close()
-        return
+        return True
 
-    def get_time_accessed(self, ip):
+    def get_time_accessed(self, ip, domain):
         conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
         conn.autocommit = True
         
         cur = conn.cursor()
-        accessedTime = None
+        accessedTime = []
         try:
             cur.execute(
-                "SELECT accessed_time FROM crawldb.ips WHERE ip=%s;",
-                (ip,)
+                "SELECT accessed_time_sec FROM crawldb.ips WHERE ip=%s OR domain_name=%s;",
+                (ip,domain)
             )
 
             result = cur.fetchall()
             if result:
-                accessedTime = result[0][0]
+                accessedTime = list(result[0])
+                if DEBUG_MODE:
+                    print(accessedTime)
         except:
-            print("No more urls in frontier")
+            if DEBUG_MODE:
+                print("No such IP and domain combination  in the database")
         
         cur.close()
         conn.close()
         return accessedTime
 
-    def alter_time_accessed(self, ip, accessedTime):
+    def get_time_accessed_exact(self, ip, domain):
+        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+        conn.autocommit = True
+        
+        cur = conn.cursor()
+        accessedTime = []
+        try:
+            cur.execute(
+                "SELECT accessed_time_sec FROM crawldb.ips WHERE ip=%s AND domain_name=%s;",
+                (ip,domain)
+            )
+
+            result = cur.fetchall()
+            if result:
+                accessedTime = list(result[0])
+                if DEBUG_MODE:
+                    print(accessedTime)
+        except:
+            if DEBUG_MODE:
+                print("No such IP and domain combination  in the database")
+        
+        cur.close()
+        conn.close()
+        return accessedTime
+
+    def alter_time_accessed(self, ip, domain, accessedTime):
         conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
         conn.autocommit = True
         
         cur = conn.cursor()
         try:
             cur.execute(
-                "UPDATE crawldb.ips SET accessed_time=%s WHERE ip=%s;",
-                (accessedTime, ip)
+                "UPDATE crawldb.ips SET accessed_time_sec=%s WHERE ip=%s AND domain_name=%s;",
+                (accessedTime, ip, domain)
             )
         except:
-            print("Could not update entery")
+            if DEBUG_MODE:
+                print("Could not update time accessed for the and domain combination")
         
         cur.close()
         conn.close()

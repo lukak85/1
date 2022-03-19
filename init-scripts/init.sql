@@ -94,3 +94,26 @@ INSERT INTO crawldb.page_type VALUES
 	('BINARY'),
 	('DUPLICATE'),
 	('FRONTIER');
+
+CREATE TABLE crawldb.frontier (
+    url varchar(255)
+);
+
+INSERT INTO crawldb.frontier VALUES 
+    ('http://gov.si'),
+    ('http://evem.gov.si'),
+    ('http://e-uprava.gov.si'),
+    ('http://e-prostor.gov.si');
+
+CREATE TABLE crawldb.hash (
+    hash varchar(256),
+	page_id integer,
+    CONSTRAINT fk_url FOREIGN KEY ( page_id ) REFERENCES crawldb.page( id ) ON DELETE RESTRICT
+ );
+
+CREATE TABLE crawldb.ips (
+    ip varchar(15),
+	domain_name varchar(255),
+    accessed_time_sec float,
+    CONSTRAINT unq_ip_and_domain UNIQUE ( ip, domain_name )
+);

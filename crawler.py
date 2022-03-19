@@ -55,6 +55,7 @@ class Crawler:
         print()
         print("-------------------- THREAD " + str(self.INSTANCE) + " ---------------------")
         print('Now crawling '+ page_url)
+        print('At time '+ str(datetime.now()))
         print("---------------------------------------------------")
         print()
 
@@ -66,17 +67,20 @@ class Crawler:
 
         # Get IP of domain, to check if we can call it yet
         ip = socket.gethostbyname(domain)
-        timePreviousAccessed = self.crawlerDB.get_time_accessed(ip)
 
-        accessedTime = ""
-        if timePreviousAccessed:
+        # TODO - fix this so that it's done in one session
+        timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
+
+        if self.crawlerDB.get_time_accessed_exact(ip, domain) == []:
+            accessedTime = time.time()
+            self.crawlerDB.insert_ip(ip, domain, accessedTime)
+        else:
             while not self.hasEnoughTimeElapsed(timePreviousAccessed):
                 time.sleep(self.TIMEOUT)
-            accessedTime = datetime.now().isoformat()
-            self.crawlerDB.alter_time_accessed(accessedTime)
-        else:
-            accessedTime = datetime.now().isoformat()
+            accessedTime = time.time()
+            self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
 
+        accessedTime = datetime.now().isoformat()
         gatheredLinksSet, html = self.gather_links(page_url)
 
         # Filter the appropriate links and modify them
@@ -168,7 +172,7 @@ class Crawler:
             with urllib.request.urlopen(request) as response: 
                 html = response.read().decode("utf-8")
         except:
-            print("Not able to retrieve robots.txt")
+            print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve robots.txt")
 
         return html
 
@@ -181,7 +185,7 @@ class Crawler:
             sitemap_links, _, _ = self.gather_links(domain)
             content = list(sitemap_links)
         except:
-            print("Not able to retrieve sitemap.xml")
+            print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve sitemap.xml")
 
         return ", ".join(content)
 
@@ -226,21 +230,19 @@ class Crawler:
 
         return hash == savedHash
 
-    def hasEnoughTimeElapsed(self, timePreviousAccessed):
-        prev = time.strptime(timePreviousAccessed)
-        curr = time.strptime(datetime.now().isoformat())
+    def hasEnoughTimeElapsed(self, prevAll):
+        for prev in prevAll:
+            curr = time.time()
+            diff = curr - prev
 
-        prev = time.mktime(prev)
-        curr = time.mktime(curr)
-
-        diff = curr - prev
-
-        seconds = int(diff) % 60
-
-        if seconds > self.TIMEOUT:
-            return True
-        else:
-            return False
+            if diff > self.TIMEOUT:
+                if DEBUG_MODE:
+                    print("INSTANCE " + str(self.INSTANCE) + ": Enough time has passed")
+                return True
+            else:
+                if DEBUG_MODE:
+                    print("INSTANCE " + str(self.INSTANCE) + ": Not enough time has passed (" + str(diff) + "s)")
+                return False
 
     def close_crawler(self):
         self.DRIVER.close()
