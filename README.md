@@ -17,4 +17,4 @@ To log into the database and execute SQL statements, run the following command: 
 
 ## Running the crawler
 
-In order to run the crawler, simply run the `main.py` file.
+In order to run the crawler, simply run the `main.py` file. To adjust some of the settings, change the constants inside `project_properties.py`.
