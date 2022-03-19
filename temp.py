@@ -1,3 +1,4 @@
+from cgitb import html
 import urlcanon
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
@@ -63,6 +64,24 @@ def hrefLinks():
             # TODO: kanonizacija itd, klic funkcije
             # TODO: zapis v db
 
+
+# onclick="myFunction()
+all_onClick = html_content.find_all("onclick")
+def onClickLinks():
+    end = 0
+    for element in all_onClick:
+        if element is not None and element.hasattr('onclick'): # verjetno nekaj drugače kot "in" - hasattr()
+            onClick_value = element.get('onclick')
+
+            if len(onClick_value) != 0 and onClick_value is not None:
+                for r in robots_rules:
+                    if r in onClick_value:
+                        end = 1
+            # TODO: kanonizacija, klic funkcije
+            # TODO: shranjevanje
+
+
+
 # prebiranje dovoljenj iz robots.txt in sitemap.xml,
 def getRobotsRulesD(robotsFile):
     robots_split = robotsFile.split("\n")
@@ -90,7 +109,7 @@ def getSitemap(robotsFile):
     # iz robots.txt sklepam?
     robots_split = robotsFile.split("\n")
     sitemapFile = ""
-    
+
     for i in robots_split:
         if "Sitemap:" in i:
             temp = i.split(" ")
