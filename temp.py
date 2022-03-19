@@ -1,11 +1,13 @@
 import urlcanon
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
 
 # določanje vrste URL-ja (torej al je HTML, BINARY, ...)
 
 BINARY_LIST = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
-IMAGE_LIST = [".png", ".jpg", ".jpeg", ".gif"]
+IMAGE_LIST = [".png", ".PNG", ".jpg", ".JPG", ".JPEG" ".jpeg", ".gif", ".GIF"]
 ELIMINATE_LIST = ["http://www", "http://www.", "https://www", "http://www.", "http://," "https://", "www", "www.", ".html" ]
+HEAD_LIST = ["favicon.ico", "maps.googleapis.", "fonts.googleapis."]
 
 def checkIfBinary(url):
     isHtml = ".html"
@@ -61,9 +63,58 @@ def hrefLinks():
             # TODO: kanonizacija itd, klic funkcije
             # TODO: zapis v db
 
+# prebiranje dovoljenj iz robots.txt in sitemap.xml,
+def getRobotsRulesD(robotsFile):
+    robots_split = robotsFile.split("\n")
+    rules_disallowed = []
+    for i in robots_split:
+        if "Disallow:" in i:
+            temp = i.split(" ")
+            if(len(temp) >= 2):
+                temp2 = i.split(" ")[1]
+                rules_disallowed.append(temp2)
+    return rules_disallowed
+
+def getRobotsRulesA(robotsFile):
+    robots_split = robotsFile.split("\n")
+    rules_allowed = []
+    for i in robots_split:
+        if "Allow:" in i:
+            temp = i.split(" ")
+            if(len(temp) >= 2):
+                temp2 = i.split(" ")[1]
+                rules_allowed.append(temp2)
+    return rules_allowed
+
+def getSitemap(robotsFile):
+    # iz robots.txt sklepam?
+    robots_split = robotsFile.split("\n")
+    sitemapFile = ""
+    
+    for i in robots_split:
+        if "Sitemap:" in i:
+            temp = i.split(" ")
+            if(len(temp) >= 2):
+                temp2 = i.split(" ")[1]
+                sitemapFile = temp2
+    return sitemapFile
+
+def processSitemap(sitemapFile):
+    # returns a list of URLs of all the websites listed in sitemap
+    # parsing, canonization? klic funkcije - a lahko kar beautiful soup uporabim?
+    file_s = BeautifulSoup(sitemapFile, features='html.parser')
+    url_sitemap = []
+
+    for i in file_s:
+        url_sitemap.append(i.text) 
+
+    return url_sitemap
+
+
 
 
 # možno da se podatek o datoteki ne nahaja v končnici URLja in je zato treba preverit še head content
+# def getLinksFromHead():
 
 
 def urlCanonization(url):
@@ -75,5 +126,6 @@ def urlCanonization(url):
             url = url.replace(element, "")
     
     pass
+
 
 
