@@ -54,6 +54,25 @@ class CrawlerDatabase:
         
         return site_id
 
+    
+    def find_site_robots(self, domain):
+        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+        conn.autocommit = True
+        
+        cur = conn.cursor()
+        cur.execute("SELECT robots_content FROM crawldb.site WHERE domain='" + domain + "';")
+        
+        # Check if array is empty, meaning we didn't find the site already present in the table
+        robots = None
+        result = cur.fetchall()
+        if result:
+            robots = result[0][0]
+
+        cur.close()
+        conn.close()
+        
+        return robots
+
 
 
     # ----------------

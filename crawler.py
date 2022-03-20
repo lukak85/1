@@ -10,27 +10,17 @@ import requests
 import socket
 import time
 
+from urllib.parse import urlparse
+from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+
 # Internal
 from domain import *
-from link_finder import LinkFinder
+from link_handler import LinkHandler
 from queue import *
 from project_properties import *
 
 class Crawler:
-
-    PROJECT_NAME = ''
-    INSTANCE = ''
-
-    crawlerDB = None
-
-    ALLOWED_DOMAINS = set()
-
-    # This is used for Selenium so that pages with JS will render properly
-    WEB_DRIVER_LOCATION = ''
-    TIMEOUT = 5
-    CHROME_OPTIONS = None
-    DRIVER = None
-
     
     def __init__(self, project_name, timeout, web_driver_location, allowed_domains, crawlerDB, instance):
         self.PROJECT_NAME = project_name
@@ -43,6 +33,12 @@ class Crawler:
         self.TIMEOUT = timeout
         self.WEB_DRIVER_LOCATION = web_driver_location
 
+        # Possible values for page type
+        self.PAGE_TYPE = ['HTML', 'BINARY', 'DUPLICATE', 'FRONITER']
+        self.BINARY_LIST = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
+        self.IMAGE_LIST = [".png", ".PNG", ".jpg", ".JPG", ".JPEG" ".jpeg", ".gif", ".GIF"]
+
+        # This is used for Selenium so that pages with JS will render properly
         self.CHROME_OPTIONS = Options()
         self.CHROME_OPTIONS.add_argument("user-agent=" + self.PROJECT_NAME + str(self.INSTANCE))
         self.CHROME_OPTIONS.headless = True
@@ -59,16 +55,46 @@ class Crawler:
         print("---------------------------------------------------")
         print()
 
-        # Check if website is reachable first
-        header = requests.head(page_url)
+        with urllib.request.urlopen(page_url) as response:
+            status_code = response.getcode()
+            info = response.info()
+            content_type = info.get_content_type()
 
-        # Get information about the site
-        domain = extract_domain(page_url)
+        domain = extract_domain(page_url) # Get the domain
+        ip = socket.gethostbyname(domain) # Get IP of domain, to check if we can call it yet, along with the domain
+        
 
-        # Get IP of domain, to check if we can call it yet
-        ip = socket.gethostbyname(domain)
 
-        # TODO - fix this so that it's done in one session
+        # --------------------------------------------------
+        # Get robots content of the current domain and check
+        # what is allowed and what isn't
+        # --------------------------------------------------
+
+        robots_content = self.get_robots_content(ip, domain)
+
+        if robots_content:
+            robots_A = self.getRobotsRulesA(robots_content)
+            robots_D = self.getRobotsRulesD(robots_content)
+
+            # Check if we're not allowed to visit the page by
+            # checking the robots file
+            print("################################################")
+            print("INSTANCE " + str(self.INSTANCE) + ": allowed:\n->"+ str(robots_A))
+            print("INSTANCE " + str(self.INSTANCE) + ": disallowed:\n->"+ str(robots_D))
+            print("################################################")
+
+            split_url = page_url.split("/")
+
+            if len(split_url) > 3 and "/" + split_url[3] in robots_D:
+                print("INSTANCE " + str(self.INSTANCE) + ": robots.txt disallows the use of this page")
+                return
+
+
+
+        # ---------------------------------------------------------------
+        # Check if enough time has elapsed during the domain/IP accession
+        # ---------------------------------------------------------------
+
         timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
 
         if self.crawlerDB.get_time_accessed_exact(ip, domain) == []:
@@ -84,7 +110,6 @@ class Crawler:
         gatheredLinksSet, html = self.gather_links(page_url)
 
         # Filter the appropriate links and modify them
-        # TODO - also do canonization!!!!
         gatheredLinksList = list(gatheredLinksSet)
         for i in range(len(gatheredLinksList)):
             # Do not include robots.txt and sitemap.xml links
@@ -96,116 +121,127 @@ class Crawler:
                     gatheredLinksList[i] = page_url + gatheredLinksList[i]
                 else:
                     gatheredLinksList[i] = page_url + "/" + gatheredLinksList[i]
-
-        self.check_duplicates(page_url, html)
         
-        gatheredLinksSet = set(gatheredLinksList)
+        for i in range(len(gatheredLinksList)):
+            current_scheme = extract_scheme(gatheredLinksList[i])
+            current_domain = extract_domain(gatheredLinksList[i])
 
-        self.add_links_to_frontier(gatheredLinksSet)
+            gatheredLinksList[i] = self.urlCanon(gatheredLinksList[i], current_scheme, current_domain)
 
         # --------------------------------------------------------
         # Here is the necceseary stuff for inserting all the
         # necceseary data into the database
         # --------------------------------------------------------
 
+        # INSERT SITE INTO THE DATABASE
+
         site_id = self.crawlerDB.find_site(domain)
 
         if site_id == -1:
-            robots_content = self.get_robots_content(domain)
             sitemap = self.get_sitemap_content(page_url)
-            
             site_id = self.crawlerDB.insert_site(domain, robots_content, sitemap)
 
-        # Insert page into the database
 
-        # TODO fix this to accomodate different page types
-        page_id = self.crawlerDB.insert_page(site_id, 'HTML', page_url, html, header.status_code, accessedTime)
+        # INSERT PAGE INTO THE DATABASE
 
-        # Insert hash
+        # Checking page type
+        if self.check_duplicates(page_url, html):
+            page_type = self.PAGE_TYPE[2]
+        elif content_type != "text/html":
+            page_type = self.PAGE_TYPE[1]
+        else:
+            page_type = self.PAGE_TYPE[0]
+
+        page_id = self.crawlerDB.insert_page(site_id, page_type, page_url, html, status_code, accessedTime)
+
+        # INSERT HASH
         m = hashlib.sha256(html.encode('utf-8'))
         hash = m.digest()
         self.crawlerDB.insert_hash(page_id, hash)
 
-        # TODO - all the other data
-        # Also reorder some methods
-
-        # Create a link if the said page is present in the database
-        for url in gatheredLinksList:
+        # CREATE LINK IF THE PAGE IS PRESENT IN THE DATABASE
+        for url in gatheredLinksSet:
             self.crawlerDB.insert_link(page_id, self.crawlerDB.find_page(url))
         
-        # TODO - check what stuff is binary data, and insert it accordingly
-        """ JUST PSEUDOCODE
-        gatheredData = # get the data from links
-        for data in gatheredData:
-            insert_page_data(page_id, "PDF", data.data) # TODO - change it so it's not only PDFs
-        """
+        # INSERT BINARY CONTENTS FROM URL LIST INTO THE DATABASE
 
-        # TODO - get image data
-        """ JUST PSEUDOCODE
-        gatheredImages = # get the data from links
-        for image in gatheredImages:
-            insert_image(page_id, image.name, image.content.type, image.data, accessedTime)
-        """
+        # We use a while loop because we'll be deleting elements from
+        # the list as we loop trough it
+        i = 0
+        while i in len(gatheredLinksList):
+            extension = LinkHandler.checkIfBinary(gatheredLinksList[i])
+
+            if extension != ".html":
+                binary_type = ""
+
+                if extension == self.BINARY_LIST[0]:
+                    binary_type = "PDF"
+                elif extension == self.BINARY_LIST[1]:
+                    binary_type = "DOC"
+                elif extension == self.BINARY_LIST[2]:
+                    binary_type = "DOCX"
+                elif extension == self.BINARY_LIST[3]:
+                    binary_type = "PPT"
+                else:
+                    binary_type = "PPTX"
+
+                self.crawlerDB.insert_page_data(page_id, binary_type, None)
+
+                gatheredLinksList = gatheredLinksList.pop(i)
+            else:
+                i += 1
+
+        # INSERT IMAGE CONTENTS FROM URL LIST INTO THE DATABASE
+
+        imagesList = LinkHandler.imgLinks(html, robots_A)
+        for image in imagesList:
+            extension = LinkHandler.checkIfImage(image)
+
+            if extension in self.IMAGE_LIST:
+                self.crawlerDB.insert_image(page_id, gatheredLinksList[i], extension, None, accessedTime)
+
+                gatheredLinksList = gatheredLinksList.pop(i)
 
         # --------------------------------------------------------
 
-    # Downloader using selenium, in case the response doesn't render properly otherwise
+        gatheredLinksSet = set(gatheredLinksList)
+        self.add_links_to_frontier(gatheredLinksSet)
+
+    # -------------------------------------------------------
+    # Downloader using selenium, in case the response doesn't
+    # render properly otherwise
+    # -------------------------------------------------------
+
     def download_and_render_page(self, page_url):
         self.DRIVER.get(page_url)
-
         html = self.DRIVER.page_source
-        
         return html
 
-    def get_robots_content(self, domain):
-        # Remove \n from the sting because that posed a problem
-        domain += "/robots.txt"
-
-        html = ''
-
-        try:
-            request = urllib.request.Request(
-                domain, 
-                headers={'User-Agent': self.PROJECT_NAME}
-            )
-
-            with urllib.request.urlopen(request) as response: 
-                html = response.read().decode("utf-8")
-        except:
-            print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve robots.txt")
-
-        return html
-
-    def get_sitemap_content(self, domain):
-        domain += "/sitemap.xml" # TODO fix this, it may not reside at this domain
-
-        content = []
-
-        try:
-            sitemap_links, _, _ = self.gather_links(domain)
-            content = list(sitemap_links)
-        except:
-            print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve sitemap.xml")
-
-        return ", ".join(content)
+    # -------------------------------
+    # GET ALL THE LINKS FROM THE PAGE
+    # -------------------------------
 
     def gather_links(self, page_url):
         html_string = ''
 
         try:
             html_string = self.download_and_render_page(page_url)
-            finder = LinkFinder(extract_domain(page_url), page_url)
-            finder.feed(html_string)
+            handler = LinkHandler()
+            handler.feed(html_string)
         except Exception as e:
             print(str(e))
             return [], '' 
 
-        return finder.page_links(), html_string
+        return handler.page_links(), html_string
 
     def url_is_in_database(self, url):
         # If the search returns -1 it means we haven't found the url
         # otherwise we have foudn it
         return self.crawlerDB.find_page(url) != -1
+
+    # ------------------------------------------
+    # CHECK IF LINK IS ON THE APPROPRIATE DOMAIN
+    # ------------------------------------------
 
     def add_links_to_frontier(self, links):
         for url in links:
@@ -221,6 +257,12 @@ class Crawler:
 
             self.crawlerDB.insert_frontier(url)
 
+    # ------------------
+    # DUPLICATE CHECKING
+    # ------------------
+
+    # TODO - what if it's the same URL, how to store a duplicate
+    # when the URL is unique
     def check_duplicates(self, url, html):
         # TODO - find_page_id(url)
         m = hashlib.sha256(html.encode('utf-8'))
@@ -230,6 +272,10 @@ class Crawler:
 
         return hash == savedHash
 
+    # -----------------------------
+    # TIME CHECKING BETWEEN FETCHES
+    # -----------------------------
+
     def hasEnoughTimeElapsed(self, prevAll):
         for prev in prevAll:
             curr = time.time()
@@ -238,11 +284,186 @@ class Crawler:
             if diff > self.TIMEOUT:
                 if DEBUG_MODE:
                     print("INSTANCE " + str(self.INSTANCE) + ": Enough time has passed")
-                return True
             else:
                 if DEBUG_MODE:
                     print("INSTANCE " + str(self.INSTANCE) + ": Not enough time has passed (" + str(diff) + "s)")
                 return False
+
+        # Only return True if it's enough time has passed for all of them
+        return True
+
+
+
+    # ----------------
+    # URL CANONIZATION
+    # ----------------
+
+    def urlCanon(self, url, parent_scheme, parent_netloc):
+
+        # decoding needlessly encoded characters
+        url = urllib.parse.unquote(url)
+
+        parsed_url = urlparse(url)
+
+        scheme = parsed_url.scheme
+        scheme = str(scheme)
+        # relative to absolute
+        if not scheme:
+            scheme = parent_scheme
+        if scheme is None:
+            scheme = parent_scheme
+        scheme = scheme + ("://")
+
+        netloc = parsed_url.netloc
+        # relative to absolute
+        netloc = str(netloc)
+        if netloc is None:
+            netloc = parent_netloc
+        if not netloc:
+            netloc = parent_netloc
+
+        netloc = netloc.lower()
+        # removing www. if not beforehand
+        netloc = re.sub("www./", "/", netloc)
+        # removing default port number
+        netloc = parsed_url.hostname
+
+        add = 1
+        path = parsed_url.path
+        # add trailing slash to root directory if no path
+        if (path == "" or path == "/"):
+            path = ""
+            netloc = netloc + "/"
+        # resolving path
+        # removing default filename
+        path = re.sub("/index\.(html|htm|php)", "/", path)
+        # encoding
+        path = urllib.parse.quote(path)
+
+        # add / if the link has no .pdf, ....
+        if (path[len(path)-4] == "." or path[len(path)-5] == "."):
+            add = 0
+        if (add):
+            path = path + "/"
+
+
+        query = parsed_url.query
+        fragment = parsed_url.fragment
+        canon_url = scheme + netloc + path
+
+        return canon_url
+    
+    # -----
+    # ROBOT
+    # -----
+
+    def get_robots_content(self, ip, domain):
+        # TODO - if the domain is already saved, get robots from there and avoid
+        # the unnecesseary request
+        html = self.crawlerDB.find_site_robots(domain)
+
+        if html == None:
+            timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
+
+            while not self.hasEnoughTimeElapsed(timePreviousAccessed):
+                time.sleep(self.TIMEOUT)
+
+            accessedTime = time.time()
+            self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
+
+            domain = "http://" + domain + "/robots.txt"
+
+            if DEBUG_MODE:
+                print("INSTANCE " + str(self.INSTANCE) + ": Sending robots request to the webpage")
+                print("INSTANCE " + str(self.INSTANCE) + ": " + domain)
+            try:
+                request = urllib.request.Request(
+                    domain, 
+                    headers={'User-Agent': self.PROJECT_NAME}
+                )
+
+                with urllib.request.urlopen(request) as response: 
+                    html = response.read().decode("utf-8")
+            except:
+                print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve robots.txt")
+        else:
+            print("INSTANCE " + str(self.INSTANCE) + ": Found robots_content in the database")
+            accessedTime = time.time()
+            self.crawlerDB.insert_ip(ip, domain, accessedTime)
+
+        return html
+
+    # -----------
+    # ROBOT RULES
+    # -----------
+
+    def getRobotsRulesD(self, robotsFile):
+        robots_split = robotsFile.split("\n")
+        rules_disallowed = []
+        for i in robots_split:
+            if "Disallow:" in i:
+                temp = i.split(" ")
+                if(len(temp) >= 2):
+                    temp2 = i.split(" ")[1]
+                    rules_disallowed.append(temp2)
+        return rules_disallowed
+
+    def getRobotsRulesA(self, robotsFile):
+        robots_split = robotsFile.split("\n")
+        rules_allowed = []
+        for i in robots_split:
+            if "Allow:" in i:
+                temp = i.split(" ")
+                if(len(temp) >= 2):
+                    temp2 = i.split(" ")[1]
+                    rules_allowed.append(temp2)
+        return rules_allowed
+
+    # -------
+    # SITEMAP
+    # -------
+
+    def get_sitemap_content(self, domain):
+
+        domain += "/sitemap.xml"
+
+        content = []
+
+        try:
+            sitemap_links, _, _ = self.gather_links(domain)
+            content = list(sitemap_links)
+        except:
+            print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve sitemap.xml")
+
+        return ", ".join(content)
+
+    def getSitemap(self, robotsFile):
+        # iz robots.txt sklepam?
+        robots_split = robotsFile.split("\n")
+        sitemapFile = ""
+
+        for i in robots_split:
+            if "Sitemap:" in i:
+                temp = i.split(" ")
+                if(len(temp) >= 2):
+                    temp2 = i.split(" ")[1]
+                    sitemapFile = temp2
+        return sitemapFile
+
+    def processSitemap(self, sitemapFile):
+        # returns a list of URLs of all the websites listed in sitemap
+        # parsing, canonization? klic funkcije - a lahko kar beautiful soup uporabim?
+        file_s = BeautifulSoup(sitemapFile, features='html.parser')
+        url_sitemap = []
+
+        for i in file_s:
+            url_sitemap.append(i.text) 
+
+        return url_sitemap
+
+    # -------------------
+    # CLOSING THE CRAWLER
+    # -------------------
 
     def close_crawler(self):
         self.DRIVER.close()

@@ -1,5 +1,4 @@
 PROJECT_NAME = 'fri_wier_kj_lk_tm'
-HASH_SEED = PROJECT_NAME
 
 ALLOWED_DOMAINS_REGEX = set() # We give the set of regexes of allowed domains
 ALLOWED_DOMAINS_REGEX.add(".*.gov.si") # This means all the domains with a suffix ".gov.si" are allowed
