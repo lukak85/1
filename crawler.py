@@ -1,5 +1,4 @@
 # External
-from multiprocessing.reduction import duplicate
 import urllib
 import urllib.request
 import socket
@@ -54,8 +53,8 @@ class Crawler:
         print("---------------------------------------------------")
         print()
 
-        # Some initial filtering
-        if "mailto:" in page_url:
+        # Some initial filtering (avoiding spider traps, we don't allow links longer than 1k characters)
+        if "mailto:" in page_url or len(page_url) > 1000:
             print("INSTANCE " + str(self.INSTANCE) + ": skipping link")
             return
 
@@ -66,7 +65,6 @@ class Crawler:
                 info = response.info()
                 content_type = info.get_content_type()
         except:
-            quit()
             return
 
         domain = extract_domain(page_url) # Get the domain
@@ -125,8 +123,8 @@ class Crawler:
         try:
             gatheredLinksSet.remove(page_url)
         except:
-            print()
-        # TODO - do normalizaion to make sure this doens't happen anyways
+            if DEBUG_MODE:
+                print("Removed link pointing to itself")
 
         # Filter the appropriate links and modify them
         gatheredLinksList = list(gatheredLinksSet)
@@ -160,7 +158,8 @@ class Crawler:
                 sitemap_urls = self.processSitemap(sitemap_content)
 
             # Put the links into frontier
-            print("Adding sitemap content to frontier")
+            if DEBUG_MODE:
+                print("Adding sitemap content to frontier")
             gatheredLinksList = gatheredLinksList + sitemap_urls
 
             #Put the links into database
@@ -169,13 +168,14 @@ class Crawler:
 
         # INSERT PAGE INTO THE DATABASE
 
-        # Checking page type - TODO - reorder so that duplicate checking is done sooner, before link extraction
+        # Checking page type
         duplicateId = self.check_duplicates(html)
         if duplicateId != -1:
             page_type = self.PAGE_TYPE[2]
             html = ''
         elif content_type != "text/html":
             page_type = self.PAGE_TYPE[1]
+            html = ''
         else:
             page_type = self.PAGE_TYPE[0]
 
@@ -261,12 +261,8 @@ class Crawler:
     def gather_links(self, page_url, robots_rules):
         html_string = ''
 
-        try:
-            html_string = self.download_and_render_page(page_url)
-            links = self.linkHandler.hrefLinks(html_string, robots_rules, page_url) + self.linkHandler.onClickLinks(html_string, robots_rules, page_url)
-        except Exception as e:
-            print(str(e))
-            return [], '' 
+        html_string = self.download_and_render_page(page_url)
+        links = self.linkHandler.hrefLinks(html_string, robots_rules, page_url) + self.linkHandler.onClickLinks(html_string, robots_rules, page_url)
 
         return set(links), html_string
 

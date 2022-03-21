@@ -15,8 +15,6 @@ class CrawlerThread(threading.Thread):
         self.crawler = Crawler(PROJECT_NAME, TIMEOUT, WEB_DRIVER_LOCATION, ALLOWED_DOMAINS_REGEX, crawlerDB, thread)
 
     def run(self):
-        # TODO - fix this so that it closes properly when
-        # no more links are present
         while True:
             with lock:
                 currentUrl = self.crawlerDB.get_first_frontier()

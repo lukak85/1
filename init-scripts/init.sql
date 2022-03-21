@@ -96,17 +96,18 @@ INSERT INTO crawldb.page_type VALUES
 	('FRONTIER');
 
 CREATE TABLE crawldb.frontier (
-    url varchar(255)
+    url varchar(255),
+	CONSTRAINT unq_url_frontier UNIQUE ( url )
 );
 
 INSERT INTO crawldb.frontier VALUES 
-    ('http://gov.si'),
-    ('http://evem.gov.si'),
-    ('http://e-uprava.gov.si'),
-    ('http://e-prostor.gov.si');
+    ('http://gov.si/'),
+    ('http://evem.gov.si/'),
+    ('http://e-uprava.gov.si/'),
+    ('http://e-prostor.gov.si/');
 
 CREATE TABLE crawldb.hash (
-    hash varchar(256),
+    hash bytea,
 	page_id integer,
     CONSTRAINT fk_url FOREIGN KEY ( page_id ) REFERENCES crawldb.page( id ) ON DELETE RESTRICT
  );

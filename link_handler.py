@@ -1,10 +1,13 @@
+# External
 import urllib
 from urllib.parse import urlparse
 import re
 from html.parser import HTMLParser
 from bs4 import BeautifulSoup
-from domain import *
 from url_normalize import url_normalize
+
+# Internal
+from domain import *
 
 class LinkHandler(HTMLParser):
 
@@ -50,7 +53,7 @@ class LinkHandler(HTMLParser):
                         if r in img_link:
                             noneProhibited = False
                             
-                    if noneProhibited:
+                    if noneProhibited and len(img_link) <= 255:
                         full_url = extendRelativePage(page_url, img_link)
                         full_url = self.urlCanon(full_url)
                         returning_images.append(full_url)
@@ -64,7 +67,7 @@ class LinkHandler(HTMLParser):
         returning_href_links = []
         
         for element in all_href:
-            if element is not None and element.has_attr('href'): # verjetno nekaj drugače kot "in" - hasattr()
+            if element is not None and element.has_attr('href'):
                 href_val = element['href']
 
                 if len(href_val) != 0 and href_val is not None:
@@ -74,7 +77,7 @@ class LinkHandler(HTMLParser):
                         if r in href_val:
                             noneProhibited = False
                             
-                    if noneProhibited:
+                    if noneProhibited and len(href_val) <= 3000:
                         full_url = extendRelativePage(page_url, href_val)
                         full_url = self.urlCanon(full_url)
                         returning_href_links.append(full_url)
@@ -84,12 +87,12 @@ class LinkHandler(HTMLParser):
 
     def onClickLinks(self, html_str, robots_rules, page_url):
         html = BeautifulSoup(html_str, 'html.parser')
-        all_onClick = html.find_all("onclick")
+        all_onClick = html.find_all("button")
 
         returning_onclick = []
         
         for element in all_onClick:
-            if element is not None and element.has_attr('onclick'): # verjetno nekaj drugače kot "in" - hasattr()
+            if element is not None and element.has_attr('onclick'):
                 onClick_value = element.get('onclick')
 
                 if len(onClick_value) != 0 and onClick_value is not None:
@@ -99,16 +102,12 @@ class LinkHandler(HTMLParser):
                         if r in onClick_value:
                             noneProhibited = False
 
-                    if noneProhibited:
+                    if noneProhibited and len(onClick_value) <= 3000:
                         full_url = extendRelativePage(page_url, onClick_value)
                         full_url = self.urlCanon(full_url)
                         returning_onclick.append(full_url)
 
         return returning_onclick
-
-    # ---------
-    # TEMPORARY
-    # ---------
 
     # ----------------
     # URL CANONIZATION
@@ -120,6 +119,7 @@ class LinkHandler(HTMLParser):
         url = urllib.parse.unquote(url)
 
         parsed_url = urlparse(url)
+
 
         scheme = parsed_url.scheme
         scheme = str(scheme)

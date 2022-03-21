@@ -8,9 +8,9 @@ def extract_domain(link):
 
 def extendRelativePage(page_url, relative_link):
 
-    if relative_link[0] == "#":
+    if len(relative_link) >= 1 and relative_link[0] == "#":
         return page_url
-    elif relative_link[0] == "/" and relative_link[1] == "#":
+    elif len(relative_link) >= 2 and relative_link[0] == "/" and relative_link[1] == "#":
         return page_url
     elif not "http:" in relative_link and not "https:" in relative_link:
 
@@ -22,7 +22,7 @@ def extendRelativePage(page_url, relative_link):
         if len(page_url_split) > 3 and "." in page_url_split[len(page_url_split) - 1]:
             page_url = ""
 
-            for url_element in page_url_split[0:len(page_url_split) - 2]:
+            for url_element in page_url_split[:len(page_url_split) - 1]:
                 page_url = page_url + url_element + "/"
 
         else:

@@ -300,7 +300,8 @@ class CrawlerDatabase:
                 (url,)
             )
         except:
-            print("The url '" + url + "' already exist in the frontier")
+            if DEBUG_MODE:
+                print("The url '" + url + "' already exist in the frontier")
         
         cur.close()
         conn.close()
