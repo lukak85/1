@@ -84,12 +84,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("INSERT INTO crawldb.image (page_id, filename, content_type, data, accessed_time) VALUES (FOREIGN KEY REFERENCES crawldb.page"
-                    + str(page_id) + "),'"
-                    + filename + "','"
-                    + content_type + "','"
-                    + data + "',"
-                    + str(accessed_time) + ");")
+        cur.execute(
+            "INSERT INTO crawldb.image (page_id, filename, content_type, data, accessed_time) VALUES ((SELECT id FROM crawldb.page WHERE id=%s),%s,%s,%s,%s)",
+            (page_id, filename, content_type, data, accessed_time)
+        )
         
         id = cur.fetchone()[0]
         
@@ -104,7 +102,7 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("SELECT * FROM crawldb.image WHERE page_id = '" + page_id + "' AND filename='" + filename + "';")
+        cur.execute("SELECT * FROM crawldb.image WHERE page_id = '" + str(page_id) + "' AND filename='" + filename + "';")
         
         image_id = -1
         
@@ -176,10 +174,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("INSERT INTO crawldb.page_data (page_id, data_type_code, data) VALUES (FOREIGN KEY REFERENCES crawldb.page("
-                    + page_id + "),"
-                    + data_type_code + ",'"
-                    + data + "');")
+        cur.execute(
+            "INSERT INTO crawldb.page_data (page_id, data_type_code, data) VALUES ((SELECT id FROM crawldb.page WHERE id=%s),%s,%s)",
+            (page_id, data_type_code, data)
+        )
         
         cur.close()
         conn.close()

@@ -1,4 +1,9 @@
+import urllib
+from urllib.parse import urlparse
+import re
 from html.parser import HTMLParser
+from bs4 import BeautifulSoup
+from domain import *
 
 class LinkHandler(HTMLParser):
 
@@ -26,40 +31,142 @@ class LinkHandler(HTMLParser):
                 return [url]
         return isNot
 
-    def imgLinks(self, html, robots_rules):
+    def imgLinks(self, html_str, robots_rules, page_url):
+        html = BeautifulSoup(html_str, 'html.parser')
         all_img = html.find_all("img")
-        end = 0
+
+        returning_images = []
+        
         for element in all_img:
             #if 'src' in element: # mogoče malo drugače - ne vem če to dela
-            if element.hasattr('src'):
+            if element.has_attr('src'):
                 img_link = element['src']
                 
                 if len(img_link) != 0 and img_link is not None:
-                    
+                    noneProhibited = True
+
                     for r in robots_rules:
                         if r in img_link:
-                            end = 1
+                            noneProhibited = False
+                            
+                    if noneProhibited:
+                        full_url = extendRelativePage(page_url, img_link)
+                        # TODO canonicalize URL
+                        # full_url = self.urlCanon(full_url, extract_scheme(onClick_value), extract_domain(onClick_value))
+                        returning_images.append(full_url)
 
-    def hrefLinks(self, html, robots_rules):
+        return returning_images
+
+    def hrefLinks(self, html_str, robots_rules, page_url):
+        html = BeautifulSoup(html_str, 'html.parser')
         all_href = html.find_all("a")
-        end = 0
+
+        returning_href_links = []
+        
         for element in all_href:
-            if element is not None and element.hasattr('href'): # verjetno nekaj drugače kot "in" - hasattr()
-                href_val = element.get('href')
+            if element is not None and element.has_attr('href'): # verjetno nekaj drugače kot "in" - hasattr()
+                href_val = element['href']
 
                 if len(href_val) != 0 and href_val is not None:
+                    noneProhibited = True
+
                     for r in robots_rules:
                         if r in href_val:
-                            end = 1
+                            noneProhibited = False
+                            
+                    if noneProhibited:
+                        full_url = extendRelativePage(page_url, href_val)
+                        # TODO canonicalize URL
+                        # full_url = self.urlCanon(full_url, extract_scheme(onClick_value), extract_domain(onClick_value))
+                        returning_href_links.append(full_url)
 
-    def onClickLinks(self, html, robots_rules):
+        return returning_href_links
+                
+
+    def onClickLinks(self, html_str, robots_rules, page_url):
+        html = BeautifulSoup(html_str, 'html.parser')
         all_onClick = html.find_all("onclick")
-        end = 0
+
+        returning_onclick = []
+        
         for element in all_onClick:
-            if element is not None and element.hasattr('onclick'): # verjetno nekaj drugače kot "in" - hasattr()
+            if element is not None and element.has_attr('onclick'): # verjetno nekaj drugače kot "in" - hasattr()
                 onClick_value = element.get('onclick')
 
                 if len(onClick_value) != 0 and onClick_value is not None:
+                    noneProhibited = True
+
                     for r in robots_rules:
                         if r in onClick_value:
-                            end = 1
+                            noneProhibited = False
+
+                    if noneProhibited:
+                        full_url = extendRelativePage(page_url, onClick_value)
+                        # TODO canonicalize URL
+                        # full_url = self.urlCanon(full_url, extract_scheme(onClick_value), extract_domain(onClick_value))
+                        returning_onclick.append(full_url)
+
+        return returning_onclick
+
+    # ---------
+    # TEMPORARY
+    # ---------
+
+    # ----------------
+    # URL CANONIZATION
+    # ----------------
+
+    def urlCanon(self, url, parent_scheme, parent_netloc):
+
+        # decoding needlessly encoded characters
+        url = urllib.parse.unquote(url)
+
+        parsed_url = urlparse(url)
+
+        scheme = parsed_url.scheme
+        scheme = str(scheme)
+        # relative to absolute
+        if not scheme:
+            scheme = parent_scheme
+        if scheme is None:
+            scheme = parent_scheme
+        scheme = scheme + ("://")
+
+        netloc = parsed_url.netloc
+        # relative to absolute
+        netloc = str(netloc)
+        if netloc is None:
+            netloc = parent_netloc
+        if not netloc:
+            netloc = parent_netloc
+
+        netloc = netloc.lower()
+        # removing www. if not beforehand
+        netloc = re.sub("www./", "/", netloc)
+        # removing default port number
+        netloc = parsed_url.hostname
+
+        add = 1
+        path = parsed_url.path
+        # add trailing slash to root directory if no path
+        if (path == "" or path == "/"):
+            path = ""
+            netloc = netloc + "/"
+        # resolving path
+        # removing default filename
+        path = re.sub("/index\.(html|htm|php)", "/", path)
+        # encoding
+        path = urllib.parse.quote(path)
+
+        # add / if the link has no .pdf, ....
+        if (path[len(path)-4] == "." or path[len(path)-5] == "."):
+            add = 0
+        if (add):
+            path = path + "/"
+
+
+        query = parsed_url.query
+        fragment = parsed_url.fragment
+        canon_url = scheme + netloc + path
+
+        return canon_url

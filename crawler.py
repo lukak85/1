@@ -1,17 +1,13 @@
 # External
 import urllib
-from datetime import datetime
+import urllib.request
+import socket
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-import re
 import hashlib
-import requests
-
-import socket
 import time
-
-from urllib.parse import urlparse
-from urllib.parse import urlparse
+from datetime import datetime
+import re
 from bs4 import BeautifulSoup
 
 # Internal
@@ -27,6 +23,8 @@ class Crawler:
         self.INSTANCE = instance
 
         self.crawlerDB = crawlerDB
+
+        self.linkHandler = LinkHandler()
 
         self.ALLOWED_DOMAINS = allowed_domains
 
@@ -72,6 +70,8 @@ class Crawler:
 
         robots_content = self.get_robots_content(ip, domain)
 
+        robots_D = []
+
         if robots_content:
             robots_A = self.getRobotsRulesA(robots_content)
             robots_D = self.getRobotsRulesD(robots_content)
@@ -107,7 +107,14 @@ class Crawler:
             self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
 
         accessedTime = datetime.now().isoformat()
-        gatheredLinksSet, html = self.gather_links(page_url)
+        gatheredLinksSet, html = self.gather_links(page_url, robots_D)
+
+        # If we got the same link we reside in right now, we get rid of it
+        try:
+            gatheredLinksSet.remove(page_url)
+        except:
+            print()
+        # TODO - do normalizaion to make sure this doens't happen anyways
 
         # Filter the appropriate links and modify them
         gatheredLinksList = list(gatheredLinksSet)
@@ -116,17 +123,8 @@ class Crawler:
             if re.search(".*.robots.txt$", gatheredLinksList[i]) or re.search(".*.sitemap.xml$", gatheredLinksList[i]):
                 continue
             # Check if it's the proper format, if not, it's a relative link
-            if not re.search("^http*.", gatheredLinksList[i]):
-                if gatheredLinksList[i][0] == "/":
-                    gatheredLinksList[i] = page_url + gatheredLinksList[i]
-                else:
-                    gatheredLinksList[i] = page_url + "/" + gatheredLinksList[i]
-        
-        for i in range(len(gatheredLinksList)):
-            current_scheme = extract_scheme(gatheredLinksList[i])
-            current_domain = extract_domain(gatheredLinksList[i])
+            gatheredLinksList[i] = extendRelativePage(page_url, gatheredLinksList[i])
 
-            gatheredLinksList[i] = self.urlCanon(gatheredLinksList[i], current_scheme, current_domain)
 
         # --------------------------------------------------------
         # Here is the necceseary stuff for inserting all the
@@ -168,8 +166,8 @@ class Crawler:
         # We use a while loop because we'll be deleting elements from
         # the list as we loop trough it
         i = 0
-        while i in len(gatheredLinksList):
-            extension = LinkHandler.checkIfBinary(gatheredLinksList[i])
+        while i < len(gatheredLinksList):
+            extension = self.linkHandler.checkIfBinary(gatheredLinksList[i])
 
             if extension != ".html":
                 binary_type = ""
@@ -185,26 +183,29 @@ class Crawler:
                 else:
                     binary_type = "PPTX"
 
-                self.crawlerDB.insert_page_data(page_id, binary_type, None)
+                self.crawlerDB.insert_page_data(page_id, binary_type, b"None")
 
-                gatheredLinksList = gatheredLinksList.pop(i)
+                gatheredLinksList.pop(i)
             else:
                 i += 1
 
         # INSERT IMAGE CONTENTS FROM URL LIST INTO THE DATABASE
 
-        imagesList = LinkHandler.imgLinks(html, robots_A)
+        imagesList = list(set(self.linkHandler.imgLinks(html, robots_D, page_url))) # Getting rid of duplicates
         for image in imagesList:
-            extension = LinkHandler.checkIfImage(image)
+            extension = self.linkHandler.checkIfImage(image)
 
             if extension in self.IMAGE_LIST:
-                self.crawlerDB.insert_image(page_id, gatheredLinksList[i], extension, None, accessedTime)
-
-                gatheredLinksList = gatheredLinksList.pop(i)
+                self.crawlerDB.insert_image(page_id, imagesList[i], extension, b"None", accessedTime)
 
         # --------------------------------------------------------
 
         gatheredLinksSet = set(gatheredLinksList)
+        print()
+        print("****************** LIST OF GATHERED LINKS **********************")
+        print(gatheredLinksList)
+        print("****************************************************************")
+        print()
         self.add_links_to_frontier(gatheredLinksSet)
 
     # -------------------------------------------------------
@@ -221,18 +222,17 @@ class Crawler:
     # GET ALL THE LINKS FROM THE PAGE
     # -------------------------------
 
-    def gather_links(self, page_url):
+    def gather_links(self, page_url, robots_rules):
         html_string = ''
 
         try:
             html_string = self.download_and_render_page(page_url)
-            handler = LinkHandler()
-            handler.feed(html_string)
+            links = self.linkHandler.hrefLinks(html_string, robots_rules, page_url) + self.linkHandler.onClickLinks(html_string, robots_rules, page_url)
         except Exception as e:
             print(str(e))
             return [], '' 
 
-        return handler.page_links(), html_string
+        return set(links), html_string
 
     def url_is_in_database(self, url):
         # If the search returns -1 it means we haven't found the url
@@ -249,7 +249,7 @@ class Crawler:
             isDomainAllowed = False
 
             for allowed_domain in self.ALLOWED_DOMAINS:
-                if re.search(allowed_domain, extract_domain(url)):
+                if len(url.split("/")) > 2 and re.search(allowed_domain, extract_domain(url)):
                     isDomainAllowed = True
 
             if not isDomainAllowed:
@@ -291,67 +291,6 @@ class Crawler:
 
         # Only return True if it's enough time has passed for all of them
         return True
-
-
-
-    # ----------------
-    # URL CANONIZATION
-    # ----------------
-
-    def urlCanon(self, url, parent_scheme, parent_netloc):
-
-        # decoding needlessly encoded characters
-        url = urllib.parse.unquote(url)
-
-        parsed_url = urlparse(url)
-
-        scheme = parsed_url.scheme
-        scheme = str(scheme)
-        # relative to absolute
-        if not scheme:
-            scheme = parent_scheme
-        if scheme is None:
-            scheme = parent_scheme
-        scheme = scheme + ("://")
-
-        netloc = parsed_url.netloc
-        # relative to absolute
-        netloc = str(netloc)
-        if netloc is None:
-            netloc = parent_netloc
-        if not netloc:
-            netloc = parent_netloc
-
-        netloc = netloc.lower()
-        # removing www. if not beforehand
-        netloc = re.sub("www./", "/", netloc)
-        # removing default port number
-        netloc = parsed_url.hostname
-
-        add = 1
-        path = parsed_url.path
-        # add trailing slash to root directory if no path
-        if (path == "" or path == "/"):
-            path = ""
-            netloc = netloc + "/"
-        # resolving path
-        # removing default filename
-        path = re.sub("/index\.(html|htm|php)", "/", path)
-        # encoding
-        path = urllib.parse.quote(path)
-
-        # add / if the link has no .pdf, ....
-        if (path[len(path)-4] == "." or path[len(path)-5] == "."):
-            add = 0
-        if (add):
-            path = path + "/"
-
-
-        query = parsed_url.query
-        fragment = parsed_url.fragment
-        canon_url = scheme + netloc + path
-
-        return canon_url
     
     # -----
     # ROBOT
