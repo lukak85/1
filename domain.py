@@ -8,23 +8,30 @@ def extract_domain(link):
 
 def extendRelativePage(page_url, relative_link):
 
-    if not "http:" in relative_link and not "https:" in relative_link and not relative_link[0] == "#":
+    if relative_link[0] == "#":
+        return page_url
+    elif relative_link[0] == "/" and relative_link[1] == "#":
+        return page_url
+    elif not "http:" in relative_link and not "https:" in relative_link:
+
         if relative_link[0] == "/":
             relative_link = relative_link[1:]
 
         page_url_split = page_url.split("/")
-        if ".html" in page_url_split[len(page_url_split) - 1] or ".htm" in page_url_split[len(page_url_split) - 1] or ".php" in page_url_split[len(page_url_split) - 1]:
+        
+        if len(page_url_split) > 3 and "." in page_url_split[len(page_url_split) - 1]:
             page_url = ""
 
             for url_element in page_url_split[0:len(page_url_split) - 2]:
-                page_url += url_element
+                page_url = page_url + url_element + "/"
 
         else:
             if page_url[len(page_url) - 1] == "/":
                 page_url = page_url + relative_link
             else:
                 page_url = page_url + "/" + relative_link
+
     else:
-        return relative_link
+        page_url = relative_link
 
     return page_url

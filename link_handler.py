@@ -3,7 +3,6 @@ from urllib.parse import urlparse
 import re
 from html.parser import HTMLParser
 from bs4 import BeautifulSoup
-from numpy import full
 from domain import *
 from url_normalize import url_normalize
 
@@ -13,7 +12,7 @@ class LinkHandler(HTMLParser):
         super().__init__()
 
         self.BINARY_LIST = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
-        self.IMAGE_LIST = [".png", ".PNG", ".jpg", ".JPG", ".JPEG" ".jpeg", ".gif", ".GIF"]
+        self.IMAGE_LIST = [".png", ".PNG", ".jpg", ".JPG", ".JPEG", ".jpeg", ".gif", ".GIF"]
         self.ELIMINATE_LIST = ["http://www", "http://www.", "https://www", "http://www.", "http://," "https://", "www", "www.", ".html" ]
         self.HEAD_LIST = ["favicon.ico", "maps.googleapis.", "fonts.googleapis."]
 
@@ -30,7 +29,7 @@ class LinkHandler(HTMLParser):
         for image in self.IMAGE_LIST:
             d = len(image)
             if url[-d:] == image:
-                return [url]
+                return image
         return isNot
 
     def imgLinks(self, html_str, robots_rules, page_url):

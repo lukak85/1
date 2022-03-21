@@ -34,7 +34,7 @@ class Crawler:
         # Possible values for page type
         self.PAGE_TYPE = ['HTML', 'BINARY', 'DUPLICATE', 'FRONITER']
         self.BINARY_LIST = [".pdf", ".doc", ".docx", ".ppt", ".pptx"]
-        self.IMAGE_LIST = [".png", ".PNG", ".jpg", ".JPG", ".JPEG" ".jpeg", ".gif", ".GIF"]
+        self.IMAGE_LIST = [".png", ".PNG", ".jpg", ".JPG", ".JPEG", ".jpeg", ".gif", ".GIF"]
 
         # This is used for Selenium so that pages with JS will render properly
         self.CHROME_OPTIONS = Options()
@@ -53,10 +53,15 @@ class Crawler:
         print("---------------------------------------------------")
         print()
 
-        with urllib.request.urlopen(page_url) as response:
-            status_code = response.getcode()
-            info = response.info()
-            content_type = info.get_content_type()
+        # If for some reason or other, the website cannot be reached, move on
+        try:
+            with urllib.request.urlopen(page_url) as response:
+                status_code = response.getcode()
+                info = response.info()
+                content_type = info.get_content_type()
+        except:
+            quit()
+            return
 
         domain = extract_domain(page_url) # Get the domain
         ip = socket.gethostbyname(domain) # Get IP of domain, to check if we can call it yet, along with the domain
@@ -76,12 +81,13 @@ class Crawler:
             robots_A = self.getRobotsRulesA(robots_content)
             robots_D = self.getRobotsRulesD(robots_content)
 
-            # Check if we're not allowed to visit the page by
-            # checking the robots file
-            print("################################################")
-            print("INSTANCE " + str(self.INSTANCE) + ": allowed:\n->"+ str(robots_A))
-            print("INSTANCE " + str(self.INSTANCE) + ": disallowed:\n->"+ str(robots_D))
-            print("################################################")
+            if DEBUG_MODE:
+                # Check if we're not allowed to visit the page by
+                # checking the robots file
+                print("################################################")
+                print("INSTANCE " + str(self.INSTANCE) + ": allowed:\n->"+ str(robots_A))
+                print("INSTANCE " + str(self.INSTANCE) + ": disallowed:\n->"+ str(robots_D))
+                print("################################################")
 
             split_url = page_url.split("/")
 
@@ -161,6 +167,20 @@ class Crawler:
         for url in gatheredLinksSet:
             self.crawlerDB.insert_link(page_id, self.crawlerDB.find_page(url))
         
+        # INSERT IMAGE CONTENTS FROM URL LIST INTO THE DATABASE
+
+        imagesList = list(set(self.linkHandler.imgLinks(html, robots_D, page_url))) # Getting rid of duplicates
+        print(imagesList)
+        for image in imagesList:
+            extension = self.linkHandler.checkIfImage(image)
+
+            if extension == self.IMAGE_LIST[0] or extension == self.IMAGE_LIST[1]:
+                self.crawlerDB.insert_image(page_id, image, "PNG", b"None", accessedTime)
+            elif extension == self.IMAGE_LIST[2] or extension == self.IMAGE_LIST[3] or extension == self.IMAGE_LIST[4] or extension == self.IMAGE_LIST[5]:
+                self.crawlerDB.insert_image(page_id, image, "JPG", b"None", accessedTime)
+            elif extension == self.IMAGE_LIST[6] or extension == self.IMAGE_LIST[7]:
+                self.crawlerDB.insert_image(page_id, image, "GIF", b"None", accessedTime)
+
         # INSERT BINARY CONTENTS FROM URL LIST INTO THE DATABASE
 
         # We use a while loop because we'll be deleting elements from
@@ -189,17 +209,8 @@ class Crawler:
             else:
                 i += 1
 
-        # INSERT IMAGE CONTENTS FROM URL LIST INTO THE DATABASE
-
-        imagesList = list(set(self.linkHandler.imgLinks(html, robots_D, page_url))) # Getting rid of duplicates
-        for image in imagesList:
-            extension = self.linkHandler.checkIfImage(image)
-
-            if extension in self.IMAGE_LIST:
-                self.crawlerDB.insert_image(page_id, imagesList[i], extension, b"None", accessedTime)
-
         # --------------------------------------------------------
-        
+
         if DEBUG_MODE:
             print()
             print("****************** LIST OF GATHERED LINKS **********************")
@@ -326,9 +337,11 @@ class Crawler:
                 with urllib.request.urlopen(request) as response: 
                     html = response.read().decode("utf-8")
             except:
-                print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve robots.txt")
+                if DEBUG_MODE:
+                    print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve robots.txt")
         else:
-            print("INSTANCE " + str(self.INSTANCE) + ": Found robots_content in the database")
+            if DEBUG_MODE:
+                print("INSTANCE " + str(self.INSTANCE) + ": Found robots_content in the database")
             accessedTime = time.time()
             self.crawlerDB.insert_ip(ip, domain, accessedTime)
 

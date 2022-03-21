@@ -41,7 +41,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("SELECT * FROM crawldb.site WHERE domain='" + domain + "';")
+        cur.execute(
+            "SELECT * FROM crawldb.site WHERE domain=%s;",
+            (domain,)
+        )
         
         # Check if array is empty, meaning we didn't find the site already present in the table
         site_id = -1
@@ -60,7 +63,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("SELECT robots_content FROM crawldb.site WHERE domain='" + domain + "';")
+        cur.execute(
+            "SELECT robots_content FROM crawldb.site WHERE domain=%s;",
+            (domain,)
+        )
         
         # Check if array is empty, meaning we didn't find the site already present in the table
         robots = None
@@ -89,11 +95,9 @@ class CrawlerDatabase:
             (page_id, filename, content_type, data, accessed_time)
         )
         
-        id = cur.fetchone()[0]
-        
         cur.close()
         conn.close()
-        return id
+        return
 
 
     
@@ -102,7 +106,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("SELECT * FROM crawldb.image WHERE page_id = '" + str(page_id) + "' AND filename='" + filename + "';")
+        cur.execute(
+            "SELECT * FROM crawldb.image WHERE page_id=%s AND filename=%s;",
+            (page_id,filename)
+        )
         
         image_id = -1
         
@@ -150,7 +157,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("SELECT * FROM crawldb.page WHERE url='" + url + "';")
+        cur.execute(
+            "SELECT * FROM crawldb.page WHERE url=%s;",
+            (url,)
+        )
         
         # Check if array is empty, meaning the site isn't already present in the table
         page_id = -1
@@ -195,7 +205,10 @@ class CrawlerDatabase:
         
         cur = conn.cursor()
         try:
-            cur.execute("INSERT INTO crawldb.link (from_page, to_page) VALUES ((SELECT id FROM crawldb.page WHERE id=%s), (SELECT id FROM crawldb.page WHERE id=%s));", (from_page, to_page))
+            cur.execute(
+                "INSERT INTO crawldb.link (from_page, to_page) VALUES ((SELECT id FROM crawldb.page WHERE id=%s), (SELECT id FROM crawldb.page WHERE id=%s));",
+                (from_page, to_page)
+            )
         except:
             """
             if DEBUG_MODE:
@@ -233,7 +246,10 @@ class CrawlerDatabase:
         conn.autocommit = True
         
         cur = conn.cursor()
-        cur.execute("SELECT hash FROM crawldb.hash WHERE page_id=" + str(page_id) + ";")
+        cur.execute(
+            "SELECT hash FROM crawldb.hash WHERE page_id=%s;",
+            (page_id,)
+        )
         
         # Check if array is empty, meaning the site isn't already present in the table
         hash = -1
