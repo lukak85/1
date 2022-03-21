@@ -199,13 +199,15 @@ class Crawler:
                 self.crawlerDB.insert_image(page_id, imagesList[i], extension, b"None", accessedTime)
 
         # --------------------------------------------------------
+        
+        if DEBUG_MODE:
+            print()
+            print("****************** LIST OF GATHERED LINKS **********************")
+            print(gatheredLinksList)
+            print("****************************************************************")
+            print()
 
         gatheredLinksSet = set(gatheredLinksList)
-        print()
-        print("****************** LIST OF GATHERED LINKS **********************")
-        print(gatheredLinksList)
-        print("****************************************************************")
-        print()
         self.add_links_to_frontier(gatheredLinksSet)
 
     # -------------------------------------------------------

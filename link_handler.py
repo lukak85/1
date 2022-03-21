@@ -3,7 +3,9 @@ from urllib.parse import urlparse
 import re
 from html.parser import HTMLParser
 from bs4 import BeautifulSoup
+from numpy import full
 from domain import *
+from url_normalize import url_normalize
 
 class LinkHandler(HTMLParser):
 
@@ -51,8 +53,7 @@ class LinkHandler(HTMLParser):
                             
                     if noneProhibited:
                         full_url = extendRelativePage(page_url, img_link)
-                        # TODO canonicalize URL
-                        # full_url = self.urlCanon(full_url, extract_scheme(onClick_value), extract_domain(onClick_value))
+                        full_url = self.urlCanon(full_url)
                         returning_images.append(full_url)
 
         return returning_images
@@ -76,8 +77,7 @@ class LinkHandler(HTMLParser):
                             
                     if noneProhibited:
                         full_url = extendRelativePage(page_url, href_val)
-                        # TODO canonicalize URL
-                        # full_url = self.urlCanon(full_url, extract_scheme(onClick_value), extract_domain(onClick_value))
+                        full_url = self.urlCanon(full_url)
                         returning_href_links.append(full_url)
 
         return returning_href_links
@@ -102,8 +102,7 @@ class LinkHandler(HTMLParser):
 
                     if noneProhibited:
                         full_url = extendRelativePage(page_url, onClick_value)
-                        # TODO canonicalize URL
-                        # full_url = self.urlCanon(full_url, extract_scheme(onClick_value), extract_domain(onClick_value))
+                        full_url = self.urlCanon(full_url)
                         returning_onclick.append(full_url)
 
         return returning_onclick
@@ -116,7 +115,7 @@ class LinkHandler(HTMLParser):
     # URL CANONIZATION
     # ----------------
 
-    def urlCanon(self, url, parent_scheme, parent_netloc):
+    def urlCanon(self, url):
 
         # decoding needlessly encoded characters
         url = urllib.parse.unquote(url)
@@ -126,19 +125,15 @@ class LinkHandler(HTMLParser):
         scheme = parsed_url.scheme
         scheme = str(scheme)
         # relative to absolute
-        if not scheme:
-            scheme = parent_scheme
-        if scheme is None:
-            scheme = parent_scheme
+        if not scheme or scheme is None:
+            scheme = "http"
         scheme = scheme + ("://")
 
         netloc = parsed_url.netloc
         # relative to absolute
         netloc = str(netloc)
-        if netloc is None:
-            netloc = parent_netloc
-        if not netloc:
-            netloc = parent_netloc
+        if netloc is None or not netloc:
+            netloc = extract_domain(url)
 
         netloc = netloc.lower()
         # removing www. if not beforehand
@@ -159,14 +154,12 @@ class LinkHandler(HTMLParser):
         path = urllib.parse.quote(path)
 
         # add / if the link has no .pdf, ....
-        if (path[len(path)-4] == "." or path[len(path)-5] == "."):
+        if len(path) >= 5 and (path[len(path)-4] == "." or path[len(path)-5] == "."):
             add = 0
         if (add):
             path = path + "/"
 
-
-        query = parsed_url.query
-        fragment = parsed_url.fragment
         canon_url = scheme + netloc + path
+        canon_url = url_normalize(canon_url)
 
         return canon_url
