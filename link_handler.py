@@ -53,8 +53,9 @@ class LinkHandler(HTMLParser):
                         if r in img_link:
                             noneProhibited = False
                             
-                    if noneProhibited and len(img_link) <= 255:
+                    if noneProhibited and len(img_link) <= 250:
                         full_url = extendRelativePage(page_url, img_link)
+                        full_url = full_url.strip() # Get rid of spaces; this posed a problem
                         full_url = self.urlCanon(full_url)
                         returning_images.append(full_url)
 
@@ -77,8 +78,9 @@ class LinkHandler(HTMLParser):
                         if r in href_val:
                             noneProhibited = False
                             
-                    if noneProhibited and len(href_val) <= 3000:
+                    if noneProhibited and len(href_val) <= 2900:
                         full_url = extendRelativePage(page_url, href_val)
+                        full_url = full_url.strip() # Get rid of spaces; this posed a problem
                         full_url = self.urlCanon(full_url)
                         returning_href_links.append(full_url)
 
@@ -102,8 +104,9 @@ class LinkHandler(HTMLParser):
                         if r in onClick_value:
                             noneProhibited = False
 
-                    if noneProhibited and len(onClick_value) <= 3000:
+                    if noneProhibited and len(onClick_value) <= 2900:
                         full_url = extendRelativePage(page_url, onClick_value)
+                        full_url = full_url.strip() # Get rid of spaces; this posed a problem
                         full_url = self.urlCanon(full_url)
                         returning_onclick.append(full_url)
 
@@ -115,10 +118,15 @@ class LinkHandler(HTMLParser):
 
     def urlCanon(self, url):
 
+        print("############")
+        print(url)
+
         # decoding needlessly encoded characters
         url = urllib.parse.unquote(url)
 
         parsed_url = urlparse(url)
+
+        print(parsed_url)
 
 
         scheme = parsed_url.scheme

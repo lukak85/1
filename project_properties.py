@@ -6,7 +6,7 @@ ALLOWED_DOMAINS_REGEX.add(".*.gov.si") # This means all the domains with a suffi
 WEB_DRIVER_LOCATION = "webdriver/chromedriver.exe"
 TIMEOUT = 5
 
-NUMBER_OF_WORKERS = 4
+NUMBER_OF_WORKERS = 1
 
 DEBUG_MODE = False # Use this to print out more than usual to debug
 PROD_MODE = False # Use this to save queue to file
