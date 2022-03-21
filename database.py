@@ -79,6 +79,27 @@ class CrawlerDatabase:
         
         return robots
 
+    def find_site_sitemap(self, domain):
+        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+        conn.autocommit = True
+        
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT sitemap_content FROM crawldb.site WHERE domain=%s;",
+            (domain,)
+        )
+        
+        # Check if array is empty, meaning we didn't find the site already present in the table
+        sitemap = None
+        result = cur.fetchall()
+        if result:
+            sitemap = result[0][0]
+
+        cur.close()
+        conn.close()
+        
+        return sitemap
+
 
 
     # ----------------
@@ -158,7 +179,7 @@ class CrawlerDatabase:
         
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM crawldb.page WHERE url=%s;",
+            "SELECT * FROM crawldb.page WHERE url=%s LIMIT 1;",
             (url,)
         )
         
@@ -241,26 +262,26 @@ class CrawlerDatabase:
 
 
     
-    def find_hash(self, page_id):
+    def find_hash(self, hash):
         conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
         conn.autocommit = True
         
         cur = conn.cursor()
         cur.execute(
-            "SELECT hash FROM crawldb.hash WHERE page_id=%s;",
-            (page_id,)
+            "SELECT page_id FROM crawldb.hash WHERE hash=%s LIMIT 1;",
+            (hash,)
         )
         
         # Check if array is empty, meaning the site isn't already present in the table
-        hash = -1
+        isHashPresent = -1
         result = cur.fetchall()
         if result:
-            hash = result[0][0]
+            isHashPresent =  result[0][0]
         
         cur.close()
         conn.close()
         
-        return hash
+        return isHashPresent
 
 
 

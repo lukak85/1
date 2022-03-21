@@ -1,4 +1,5 @@
 # External
+from multiprocessing.reduction import duplicate
 import urllib
 import urllib.request
 import socket
@@ -52,6 +53,11 @@ class Crawler:
         print('At time '+ str(datetime.now()))
         print("---------------------------------------------------")
         print()
+
+        # Some initial filtering
+        if "mailto:" in page_url:
+            print("INSTANCE " + str(self.INSTANCE) + ": skipping link")
+            return
 
         # If for some reason or other, the website cannot be reached, move on
         try:
@@ -142,15 +148,32 @@ class Crawler:
         site_id = self.crawlerDB.find_site(domain)
 
         if site_id == -1:
-            sitemap = self.get_sitemap_content(page_url)
-            site_id = self.crawlerDB.insert_site(domain, robots_content, sitemap)
+            # Get sitemap
+            sitemapxml = "sitemap.xml"
+            if robots_content:
+                sitemapxml = self.getSitemap(robots_content)
+
+            sitemap_content = self.get_sitemap_content(ip, domain, sitemapxml)
+
+            sitemap_urls = []
+            if sitemap_content:
+                sitemap_urls = self.processSitemap(sitemap_content)
+
+            # Put the links into frontier
+            print("Adding sitemap content to frontier")
+            gatheredLinksList = gatheredLinksList + sitemap_urls
+
+            #Put the links into database
+            site_id = self.crawlerDB.insert_site(domain, robots_content, sitemap_content)
 
 
         # INSERT PAGE INTO THE DATABASE
 
-        # Checking page type
-        if self.check_duplicates(page_url, html):
+        # Checking page type - TODO - reorder so that duplicate checking is done sooner, before link extraction
+        duplicateId = self.check_duplicates(html)
+        if duplicateId != -1:
             page_type = self.PAGE_TYPE[2]
+            html = ''
         elif content_type != "text/html":
             page_type = self.PAGE_TYPE[1]
         else:
@@ -158,19 +181,19 @@ class Crawler:
 
         page_id = self.crawlerDB.insert_page(site_id, page_type, page_url, html, status_code, accessedTime)
 
+        if duplicateId != -1:
+            self.crawlerDB.insert_link(page_id, duplicateId)
+            return # Skip all the other stuff since the site was already processed
+        
         # INSERT HASH
         m = hashlib.sha256(html.encode('utf-8'))
         hash = m.digest()
         self.crawlerDB.insert_hash(page_id, hash)
-
-        # CREATE LINK IF THE PAGE IS PRESENT IN THE DATABASE
-        for url in gatheredLinksSet:
-            self.crawlerDB.insert_link(page_id, self.crawlerDB.find_page(url))
         
         # INSERT IMAGE CONTENTS FROM URL LIST INTO THE DATABASE
 
         imagesList = list(set(self.linkHandler.imgLinks(html, robots_D, page_url))) # Getting rid of duplicates
-        print(imagesList)
+
         for image in imagesList:
             extension = self.linkHandler.checkIfImage(image)
 
@@ -247,11 +270,6 @@ class Crawler:
 
         return set(links), html_string
 
-    def url_is_in_database(self, url):
-        # If the search returns -1 it means we haven't found the url
-        # otherwise we have foudn it
-        return self.crawlerDB.find_page(url) != -1
-
     # ------------------------------------------
     # CHECK IF LINK IS ON THE APPROPRIATE DOMAIN
     # ------------------------------------------
@@ -274,16 +292,11 @@ class Crawler:
     # DUPLICATE CHECKING
     # ------------------
 
-    # TODO - what if it's the same URL, how to store a duplicate
-    # when the URL is unique
-    def check_duplicates(self, url, html):
-        # TODO - find_page_id(url)
+    def check_duplicates(self, html):
         m = hashlib.sha256(html.encode('utf-8'))
         hash = m.digest()
 
-        savedHash = self.crawlerDB.find_hash(self.crawlerDB.find_page(url))
-
-        return hash == savedHash
+        return self.crawlerDB.find_hash(hash)
 
     # -----------------------------
     # TIME CHECKING BETWEEN FETCHES
@@ -310,8 +323,6 @@ class Crawler:
     # -----
 
     def get_robots_content(self, ip, domain):
-        # TODO - if the domain is already saved, get robots from there and avoid
-        # the unnecesseary request
         html = self.crawlerDB.find_site_robots(domain)
 
         if html == None:
@@ -377,19 +388,45 @@ class Crawler:
     # SITEMAP
     # -------
 
-    def get_sitemap_content(self, domain):
+    def get_sitemap_content(self, ip, domain, sitemapxml):
+        html = self.crawlerDB.find_site_sitemap(domain)
 
-        domain += "/sitemap.xml"
+        if html == None:
+            timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
 
-        content = []
+            while not self.hasEnoughTimeElapsed(timePreviousAccessed):
+                time.sleep(self.TIMEOUT)
 
-        try:
-            sitemap_links, _, _ = self.gather_links(domain)
-            content = list(sitemap_links)
-        except:
-            print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve sitemap.xml")
+            accessedTime = time.time()
+            self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
 
-        return ", ".join(content)
+            domain = "http://" + domain + "/" + sitemapxml
+
+            if DEBUG_MODE:
+                print("INSTANCE " + str(self.INSTANCE) + ": Sending robots request to the webpage")
+                print("INSTANCE " + str(self.INSTANCE) + ": " + domain)
+            try:
+                request = urllib.request.Request(
+                    domain, 
+                    headers={'User-Agent': self.PROJECT_NAME}
+                )
+
+                with urllib.request.urlopen(request) as response: 
+                    html = response.read().decode("utf-8")
+            except:
+                if DEBUG_MODE:
+                    print("INSTANCE " + str(self.INSTANCE) + ": Not able to retrieve robots.txt")
+        else:
+            if DEBUG_MODE:
+                print("INSTANCE " + str(self.INSTANCE) + ": Found robots_content in the database")
+            accessedTime = time.time()
+            self.crawlerDB.insert_ip(ip, domain, accessedTime)
+
+        return html
+
+    # -------------
+    # SITEMAP LINKS
+    # -------------
 
     def getSitemap(self, robotsFile):
         # iz robots.txt sklepam?
