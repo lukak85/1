@@ -4,24 +4,28 @@ import threading
 # Internal
 from project_properties import *
 from crawler import Crawler
+from database import *
 
 lock = threading.Lock()
 
 class CrawlerThread(threading.Thread):
-    def __init__(self, thread, crawlerDB):
+    def __init__(self, thread):
         threading.Thread.__init__(self)
         self.thread = thread
-        self.crawlerDB = crawlerDB
-        self.crawler = Crawler(PROJECT_NAME, TIMEOUT, WEB_DRIVER_LOCATION, ALLOWED_DOMAINS_REGEX, crawlerDB, thread)
+        self.crawler = Crawler(PROJECT_NAME, TIMEOUT, WEB_DRIVER_LOCATION, ALLOWED_DOMAINS_REGEX, thread)
 
     def run(self):
         while True:
             with lock:
-                currentUrl = self.crawlerDB.get_first_frontier()
-                self.crawlerDB.delete_from_frontier(currentUrl)
+                currentUrl = get_first_frontier()
+                delete_from_frontier(currentUrl)
 
             if currentUrl != None:
-                self.crawler.crawl_page(currentUrl)
+                try:
+                    self.crawler.crawl_page(currentUrl)
+                except:
+                    print("An error occurred crawling the page, pushed to the back of frontier")
+                    insert_frontier(currentUrl)
             
             else:
                 self.close_thread()

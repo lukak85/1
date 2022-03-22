@@ -1,22 +1,19 @@
 # External
 import psycopg2
+import threading
 
 # Internal
 from project_properties import *
 
-class CrawlerDatabase:
+lock = threading.Lock()
 
-    def __init__(self, HOST, USER, PASSWORD):
-        self.host = HOST
-        self.user = USER
-        self.password = PASSWORD
+# ---------------
+# SITE MANAGEMENT
+# ---------------
 
-    # ---------------
-    # SITE MANAGEMENT
-    # ---------------
-    
-    def insert_site(self, domain, robots_content, sitemap_content):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+def insert_site(domain, robots_content, sitemap_content):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -32,12 +29,14 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return site_id
+
+    return site_id
 
 
-    
-    def find_site(self, domain):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+
+def find_site(domain):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -55,11 +54,12 @@ class CrawlerDatabase:
         cur.close()
         conn.close()
         
-        return site_id
+    return site_id
 
-    
-    def find_site_robots(self, domain):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+
+def find_site_robots(domain):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -77,10 +77,11 @@ class CrawlerDatabase:
         cur.close()
         conn.close()
         
-        return robots
+    return robots
 
-    def find_site_sitemap(self, domain):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+def find_site_sitemap(domain):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -98,16 +99,17 @@ class CrawlerDatabase:
         cur.close()
         conn.close()
         
-        return sitemap
+    return sitemap
 
 
 
-    # ----------------
-    # IMAGE MANAGEMENT
-    # ----------------
+# ----------------
+# IMAGE MANAGEMENT
+# ----------------
 
-    def insert_image(self, page_id, filename, content_type, data, accessed_time):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+def insert_image(page_id, filename, content_type, data, accessed_time):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -118,12 +120,14 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return
+
+    return
 
 
-    
-    def find_image(self, page_id, filename):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+
+def find_image(page_id, filename):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -140,17 +144,18 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        
-        return image_id
+    
+    return image_id
 
 
 
-    # ---------------
-    # PAGE MANAGEMENT
-    # ---------------
+# ---------------
+# PAGE MANAGEMENT
+# ---------------
 
-    def insert_page(self, site_id, page_type_code, url, html_content, http_status_code, accessed_time):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+def insert_page(site_id, page_type_code, url, html_content, http_status_code, accessed_time):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -170,11 +175,13 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return page_id
+
+    return page_id
 
 
-    def find_page(self, url):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+def find_page(url):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -191,17 +198,18 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        
-        return page_id
-
-
-
-    # --------------------
-    # PAGE DATA MANAGEMENT
-    # --------------------
     
-    def insert_page_data(self, page_id, data_type_code, data):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+    return page_id
+
+
+
+# --------------------
+# PAGE DATA MANAGEMENT
+# --------------------
+
+def insert_page_data(page_id, data_type_code, data):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -212,16 +220,18 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return True
+
+    return True
 
 
 
-    # ---------------
-    # LINK MANAGEMENT
-    # ---------------
-    
-    def insert_link(self, from_page, to_page):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+# ---------------
+# LINK MANAGEMENT
+# ---------------
+
+def insert_link(from_page, to_page):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -238,16 +248,18 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return
+
+    return
 
 
 
-    # ---------------
-    # HASH MANAGEMENT
-    # ---------------
-    
-    def insert_hash(self, page_id, hash):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+# ---------------
+# HASH MANAGEMENT
+# ---------------
+
+def insert_hash(page_id, hash):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -258,12 +270,14 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return
+
+    return
 
 
-    
-    def find_hash(self, hash):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+
+def find_hash(hash):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -280,17 +294,18 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        
-        return isHashPresent
-
-
-
-    # -------------------
-    # FRONTIER MANAGEMENT
-    # -------------------
     
-    def insert_frontier(self, url):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+    return isHashPresent
+
+
+
+# -------------------
+# FRONTIER MANAGEMENT
+# -------------------
+
+def insert_frontier(url):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -305,11 +320,13 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return
 
-    
-    def get_first_frontier(self):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+    return
+
+
+def get_first_frontier():
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -328,11 +345,13 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return url
 
-    
-    def delete_from_frontier(self, url):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+    return url
+
+
+def delete_from_frontier(url):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -346,14 +365,16 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return
 
-    # -------------
-    # IP MANAGEMENT
-    # -------------
+    return
 
-    def insert_ip(self, ip, domain, accessedTime):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+# -------------
+# IP MANAGEMENT
+# -------------
+
+def insert_ip(ip, domain, accessedTime):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         isNotAlreadyPresent = False
@@ -371,10 +392,12 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return True
+    
+    return True
 
-    def get_time_accessed(self, ip, domain):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+def get_time_accessed(ip, domain):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -396,10 +419,12 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return accessedTime
 
-    def get_time_accessed_exact(self, ip, domain):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+    return accessedTime
+
+def get_time_accessed_exact(ip, domain):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -421,10 +446,12 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return accessedTime
 
-    def alter_time_accessed(self, ip, domain, accessedTime):
-        conn = psycopg2.connect(host=self.host, user=self.user, password=self.password)
+    return accessedTime
+
+def alter_time_accessed(ip, domain, accessedTime):
+    with lock:
+        conn = psycopg2.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD)
         conn.autocommit = True
         
         cur = conn.cursor()
@@ -439,4 +466,5 @@ class CrawlerDatabase:
         
         cur.close()
         conn.close()
-        return
+
+    return

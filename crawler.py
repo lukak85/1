@@ -15,14 +15,13 @@ from domain import *
 from link_handler import LinkHandler
 from queue import *
 from project_properties import *
+from database import *
 
 class Crawler:
     
-    def __init__(self, project_name, timeout, web_driver_location, allowed_domains, crawlerDB, instance):
+    def __init__(self, project_name, timeout, web_driver_location, allowed_domains, instance):
         self.PROJECT_NAME = project_name
         self.INSTANCE = instance
-
-        self.crawlerDB = crawlerDB
 
         self.linkHandler = LinkHandler()
 
@@ -105,16 +104,16 @@ class Crawler:
         # Check if enough time has elapsed during the domain/IP accession
         # ---------------------------------------------------------------
 
-        timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
+        timePreviousAccessed = get_time_accessed(ip, domain)
 
-        if self.crawlerDB.get_time_accessed_exact(ip, domain) == []:
+        if get_time_accessed_exact(ip, domain) == []:
             accessedTime = time.time()
-            self.crawlerDB.insert_ip(ip, domain, accessedTime)
+            insert_ip(ip, domain, accessedTime)
         else:
             while not self.hasEnoughTimeElapsed(timePreviousAccessed):
                 time.sleep(self.TIMEOUT)
             accessedTime = time.time()
-            self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
+            alter_time_accessed(ip, domain, accessedTime)
 
         accessedTime = datetime.now().isoformat()
         gatheredLinksSet, html = self.gather_links(page_url, robots_D)
@@ -143,7 +142,7 @@ class Crawler:
 
         # INSERT SITE INTO THE DATABASE
 
-        site_id = self.crawlerDB.find_site(domain)
+        site_id = find_site(domain)
 
         if site_id == -1:
             # Get sitemap
@@ -163,7 +162,7 @@ class Crawler:
             gatheredLinksList = gatheredLinksList + sitemap_urls
 
             #Put the links into database
-            site_id = self.crawlerDB.insert_site(domain, robots_content, sitemap_content)
+            site_id = insert_site(domain, robots_content, sitemap_content)
 
 
         # INSERT PAGE INTO THE DATABASE
@@ -179,16 +178,16 @@ class Crawler:
         else:
             page_type = self.PAGE_TYPE[0]
 
-        page_id = self.crawlerDB.insert_page(site_id, page_type, page_url, html, status_code, accessedTime)
+        page_id = insert_page(site_id, page_type, page_url, html, status_code, accessedTime)
 
         if duplicateId != -1:
-            self.crawlerDB.insert_link(page_id, duplicateId)
-            return # Skip all the other stuff since the site was already processed
+            insert_link(page_id, duplicateId)
+            return # Skip all the other stuff since the site was already processed - TODO - check for this sooner
         
         # INSERT HASH
         m = hashlib.sha256(html.encode('utf-8'))
         hash = m.digest()
-        self.crawlerDB.insert_hash(page_id, hash)
+        insert_hash(page_id, hash)
         
         # INSERT IMAGE CONTENTS FROM URL LIST INTO THE DATABASE
 
@@ -198,11 +197,11 @@ class Crawler:
             extension = self.linkHandler.checkIfImage(image)
 
             if extension == self.IMAGE_LIST[0] or extension == self.IMAGE_LIST[1]:
-                self.crawlerDB.insert_image(page_id, image, "PNG", b"None", accessedTime)
+                insert_image(page_id, image, "PNG", b"None", accessedTime)
             elif extension == self.IMAGE_LIST[2] or extension == self.IMAGE_LIST[3] or extension == self.IMAGE_LIST[4] or extension == self.IMAGE_LIST[5]:
-                self.crawlerDB.insert_image(page_id, image, "JPG", b"None", accessedTime)
+                insert_image(page_id, image, "JPG", b"None", accessedTime)
             elif extension == self.IMAGE_LIST[6] or extension == self.IMAGE_LIST[7]:
-                self.crawlerDB.insert_image(page_id, image, "GIF", b"None", accessedTime)
+                insert_image(page_id, image, "GIF", b"None", accessedTime)
 
         # INSERT BINARY CONTENTS FROM URL LIST INTO THE DATABASE
 
@@ -226,7 +225,7 @@ class Crawler:
                 else:
                     binary_type = "PPTX"
 
-                self.crawlerDB.insert_page_data(page_id, binary_type, b"None")
+                insert_page_data(page_id, binary_type, b"None")
 
                 gatheredLinksList.pop(i)
             else:
@@ -282,7 +281,7 @@ class Crawler:
             if not isDomainAllowed:
                 continue
 
-            self.crawlerDB.insert_frontier(url)
+            insert_frontier(url)
 
     # ------------------
     # DUPLICATE CHECKING
@@ -292,7 +291,7 @@ class Crawler:
         m = hashlib.sha256(html.encode('utf-8'))
         hash = m.digest()
 
-        return self.crawlerDB.find_hash(hash)
+        return find_hash(hash)
 
     # -----------------------------
     # TIME CHECKING BETWEEN FETCHES
@@ -319,16 +318,16 @@ class Crawler:
     # -----
 
     def get_robots_content(self, ip, domain):
-        html = self.crawlerDB.find_site_robots(domain)
+        html = find_site_robots(domain)
 
         if html == None:
-            timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
+            timePreviousAccessed = get_time_accessed(ip, domain)
 
             while not self.hasEnoughTimeElapsed(timePreviousAccessed):
                 time.sleep(self.TIMEOUT)
 
             accessedTime = time.time()
-            self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
+            alter_time_accessed(ip, domain, accessedTime)
 
             domain = "http://" + domain + "/robots.txt"
 
@@ -350,7 +349,7 @@ class Crawler:
             if DEBUG_MODE:
                 print("INSTANCE " + str(self.INSTANCE) + ": Found robots_content in the database")
             accessedTime = time.time()
-            self.crawlerDB.insert_ip(ip, domain, accessedTime)
+            insert_ip(ip, domain, accessedTime)
 
         return html
 
@@ -385,16 +384,16 @@ class Crawler:
     # -------
 
     def get_sitemap_content(self, ip, domain, sitemapxml):
-        html = self.crawlerDB.find_site_sitemap(domain)
+        html = find_site_sitemap(domain)
 
         if html == None:
-            timePreviousAccessed = self.crawlerDB.get_time_accessed(ip, domain)
+            timePreviousAccessed = get_time_accessed(ip, domain)
 
             while not self.hasEnoughTimeElapsed(timePreviousAccessed):
                 time.sleep(self.TIMEOUT)
 
             accessedTime = time.time()
-            self.crawlerDB.alter_time_accessed(ip, domain, accessedTime)
+            alter_time_accessed(ip, domain, accessedTime)
 
             domain = "http://" + domain + "/" + sitemapxml
 
@@ -416,7 +415,7 @@ class Crawler:
             if DEBUG_MODE:
                 print("INSTANCE " + str(self.INSTANCE) + ": Found robots_content in the database")
             accessedTime = time.time()
-            self.crawlerDB.insert_ip(ip, domain, accessedTime)
+            insert_ip(ip, domain, accessedTime)
 
         return html
 
