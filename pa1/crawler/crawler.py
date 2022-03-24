@@ -169,11 +169,11 @@ class Crawler:
 
         # Checking page type
         duplicateId = self.check_duplicates(html)
-        if duplicateId != -1:
-            page_type = self.PAGE_TYPE[2]
-            html = ''
-        elif content_type != "text/html":
+        if content_type != "text/html":
             page_type = self.PAGE_TYPE[1]
+            html = ''
+        elif duplicateId != -1:
+            page_type = self.PAGE_TYPE[2]
             html = ''
         else:
             page_type = self.PAGE_TYPE[0]
