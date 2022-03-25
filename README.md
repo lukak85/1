@@ -4,3 +4,4 @@ This repository contains projects for the course Web Extraction and Information 
 
 Currenlty present:
 * [_s.pyderman_ web crawler](/pa1/)
+* [_s.pyderman_ data extractor](/pa2/)

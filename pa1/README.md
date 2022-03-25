@@ -2,7 +2,7 @@
 
 ## About
 
-__TODO__
+Web crawler, also called web spider, is an automated program which searches for and browses web pages of the world wide web. It's job is to searching and extracting the data from the web, which is then stored in a database and can be later used in various ways, depending on our goals. The goal of our project was to implement a multithreaded web crawler that would crawl domains ending in _gov.si_.
 
 ## Prerequisites
 
