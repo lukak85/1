@@ -8,6 +8,6 @@ __TODO__
 
 __TODO__
 
-## Running the crawler
+## Running the extractor
 
 __TODO__

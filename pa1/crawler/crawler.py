@@ -59,7 +59,8 @@ class Crawler:
 
         # If for some reason or other, the website cannot be reached, move on
         try:
-            with urllib.request.urlopen(page_url) as response:
+            with urllib.request.urlopen(page_url) as response:¸
+                time.sleep(self.TIMEOUT)
                 status_code = response.getcode()
                 info = response.info()
                 content_type = info.get_content_type()
@@ -303,11 +304,9 @@ class Crawler:
             diff = curr - prev
 
             if diff > self.TIMEOUT:
-                if DEBUG_MODE:
-                    print("INSTANCE " + str(self.INSTANCE) + ": Enough time has passed")
+                print("INSTANCE " + str(self.INSTANCE) + ": Enough time has passed")
             else:
-                if DEBUG_MODE:
-                    print("INSTANCE " + str(self.INSTANCE) + ": Not enough time has passed (" + str(diff) + "s)")
+                print("INSTANCE " + str(self.INSTANCE) + ": Not enough time has passed (" + str(diff) + "s)")
                 return False
 
         # Only return True if it's enough time has passed for all of them
