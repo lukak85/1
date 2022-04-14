@@ -2,12 +2,20 @@
 
 ## About
 
-__TODO__
+__TODO__ - write an introduction
+
+Explanation of each method;
+* __extraction using regular expressions__: TODO
+* __extraction using XPath__: TODO
+* __extraction using RoadRunner implementation__: using this method, we automatically extract a wrapper using which we'll extract the data from the website. In our implementation, the website first has to be converted to an XHTML compliant format. The result is then converted into a tree, which we use to compare the content of the websites and with it iteretivelly build the wrapper
 
 ## Prerequisites
 
-To run the extractor, install these libraries:
-* _treelib_
+Install the dependencies by opening the command line prompt inside [current folder](/pa2/) and running the following command:
+
+```bash
+pip install -r requirements.txt
+```
 
 ## Running the extractor
 
@@ -22,4 +30,4 @@ To run the extractor, open the command line prompt inside [implementation-extrac
 py run-extraction.py A
 ```
 
-Note that this runs the extraction using method _A_; to run using methods _B_ and _C_, use the respective letters.
+Note that the command above runs the extractor using method _A_; to run using methods _B_ and _C_, use the respective letters.

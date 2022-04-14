@@ -1,349 +1,312 @@
-from html.parser import HTMLParser
-import codecs
-from treelib import Node, Tree
+import os
+import sys
+import copy
+import traceback
 
+import bs4
+from bs4 import BeautifulSoup, Tag, NavigableString
+from lxml.html.clean import Cleaner
 
-DEBUG_MODE = False
-
-class RoadrunnerHTMLParser(HTMLParser):
-
-    def __init__(self):
-        HTMLParser.__init__(self)
-        self.html_tokens = []
-
-    def handle_starttag(self, tag, attrs):
-        self.html_tokens.append("<" + tag + ">")
-
-    def handle_endtag(self, tag):
-        self.html_tokens.append("</" + tag + ">")
-
-    def handle_data(self, data):
-        self.html_tokens.append(data)
-
+DEBUG_MODE = True
 
 """
-This is used to extract tags and data and put it into a token list,
-from where we'll be able to remove and properly anotate said data
+Create wrapper with recurvsive tag and string matching check
 """
 
-def parse(html_content):
-    parser = RoadrunnerHTMLParser()
-    parser.feed(html_content)
+def create_wrapper(site_wrapper, pages):
 
-    # Filter the data that is not neeeded, such as scripts and comments
-    return filter_content(parser.html_tokens)
-    # return filter_whitespace(parser.html_tokens)
+    # Go trough all pages, iterativelly building a wrapper
+    for page in pages:
+        site_wrapper = recursive_matching(site_wrapper, page)
 
-def filter_content(html_list):
+    return site_wrapper
+
+def recursive_matching(node1i, node2i):
+
+    # Start with the first child node
     i = 0
 
-    while i < len(html_list):
-    
-        if html_list[i] == "<script>":
-            while html_list[i] != "</script>":
-                html_list.pop(i)
-            html_list.pop(i)
-        
-        elif html_list[i] == "<!--":
-            while html_list[i] != "-->":
-                html_list.pop(i)
-            html_list.pop(i)
+    # Creating a copy of node, decoupling it from parent
+    node1 = [copy.copy(el) for el in node1i.children]
+    node2 = [copy.copy(el) for el in node2i.children]
 
-        elif html_list[i] == "<meta>":
-            html_list.pop(i)
+    if len(node1) == 0 and len(node2) == 0:
+        return node1i
 
-        elif html_list[i] == "<head>":
-            while html_list[i] != "</head>":
-                html_list.pop(i)
-            html_list.pop(i)
+    # And loop trough them, adding new ones
+    while i < len(node1) or i < len(node2):
 
-        # elif html_list[i] == "<img>":
-        #     html_list.pop(i)
-        # elif html_list[i] == "</img>":
-        #     html_list.pop(i)
-        
-        elif html_list[i] == "<svg>":
-            html_list.pop(i)
-        elif html_list[i] == "</svg>":
-            html_list.pop(i)
+        # If we came to the end with first page, but not with the second,
+        # add tags from the second page as optionals
+        if i >= len(node1) and i < len(node2):
 
-        elif html_list[i] == "<br>":
-            html_list.pop(i)
+            # We just add the remainint items, and anotate them as optionals
+            for j in range(i, len(node2)):
+                node1.insert(j, node2[j])
 
-        # elif html_list[i] == "<b>":
-        #     html_list.pop(i)
-        # elif html_list[i] == "</b>":
-        #     html_list.pop(i)
+                if isinstance(node1[j], bs4.element.Tag):
+                    node1[j]['roadrunner_optional'] = '?'
 
-        # elif html_list[i] == "<i>":
-        #     html_list.pop(i)
-        # elif html_list[i] == "</i>":
-        #     html_list.pop(i)
+        # If we came to the end with second page, but not with the first,
+        # set tags from the first page as optionals
+        elif i >= len(node2) and i < len(node1):
+            for j in range(i, len(node1)):
+                if isinstance(node1[j], bs4.element.Tag):
+                    node1[j]['roadrunner_optional'] = '?'
 
-        elif html_list[i].isspace():
-            html_list.pop(i)
+        # There is no tag mismatch, check for mismatches recursivelly
+        elif isinstance(node1[i], Tag) and isinstance(node2[i], Tag) and node1[i].name == node2[i].name:
 
-        else:
-            i += 1
+            # If current tag is of type ul, ol or td, do iterator tag mismatching
+            if node1[i].name == "ol" or node1[i].name == "ul" or node1[i].name == "thead" or node1[i].name == "tbody" or node1[i].name == "tfoot":
+                node1[i] = iterator_matching(node1[i], node2[i])
 
-    return html_list
+            # Else do regular tag mismatching
+            else:
+                node1[i] = recursive_matching(node1[i], node2[i])
 
-def filter_whitespace(html_list):
-    i = 0
+        # There is a tag mismatch, insert optionals
+        elif isinstance(node1[i], Tag) and isinstance(node2[i], Tag) and node1[i].name != node2[i].name:
 
-    while i < len(html_list):
-        if html_list[i].isspace():
-            html_list.pop(i)
+            # Do cross search (or a pseudo cross search rather)
+            # TODO - do a proper cross search
 
-        i += 1
+            # Searching for matching tags on second page
+            for j in range(i, len(node2)):
 
-    return html_list
+                # We have found the fitting tag, insert optionals
+                if isinstance(node2[j], Tag) and (len(node1) <= j or (node1[j].name == node2[j].name)):
 
-
-
-"""
-Check what matches and properly adjust the expression automatically
-"""
-
-def match(site_tokens, sites):
-    for site in sites:
-
-        # Which tag/data element we're checking atm
-        i = 0
-
-        # Looping trough all HTML elements in the file
-        while i < len(site_tokens) and i < len(site):
-
-            # Check for a mismatch in tokens
-            if site_tokens[i] != site[i]:
-
-                # Check if it's a tag mismatch or a string mismatch
-                if (site_tokens[i][0] == "<" and site_tokens[i][len(site_tokens[i]) - 1] == ">") and (site[i][0] == "<" and site[i][len(site[i]) - 1] == ">"): # Tag mismatch
-                    if DEBUG_MODE:
-                        print("------------")
-                        print("TAG MISMATCH")
-                        print("------------")
-                        print(site_tokens[i])
-                        print(site[i])
-
-                    site_tokens, site, i = tag_mismatch(site_tokens, site, i)
-
-                # There may be no tag mismatch, but just an optional present
-                # in site_tokens at this position
-                elif site[i][0] == "<" and site[i][len(site[i]) - 1] == ">" and site[i] in site_tokens[i]:
-                    True # Here just to skip the next elif statement
-
-                else: # String mismatch
-                    if DEBUG_MODE:
-                        print("---------------")
-                        print("STRING MISMATCH")
-                        print("---------------")
-                        print(site_tokens[i])
-                        print(site[i])
-
-                    site_tokens[i] = "#PCDATA"
-                    
-            i += 1
-
-    return site_tokens
-
-
-"""
-If a tag missmatch has occured, TODO - napisi do konca lol
-"""
-def tag_mismatch(site_tokens, site, i):
-
-    # Check terminal tag if it's the end of a list, and depending on what
-    # kind of list it is act accordingly
-    
-    # TODO - fix these methods
-
-    if site_tokens[i] == "</ul>" or site[i] == "</ul>":
-        site_tokens, site, i = handle_lists(site_tokens, site, i, "ul", "li")
-
-    elif site_tokens[i] == "</ol>" or site[i] == "</ol>":
-        site_tokens, site, i = handle_lists(site_tokens, site, i, "ol", "li")
-    
-    elif site_tokens[i] == "</tbody>" or site[i] == "</tbody>":
-        site_tokens, site, i = handle_lists(site_tokens, site, i, "tbody", "tr")
-    
-    
-    
-    # Optional tags
-
-    elif "<" in site[i]:
-
-        found = False
-
-        # Search for optionals on second site
-        if "</" not in site[i]: # Making sure it's not an end tag
-
-            # Do a "cross search"
-            for j in range(i, min(i + 5, len(site_tokens))):
-
-                if j < len(site) and not found and site[j] == site_tokens[i]:
-
-                    # We found a tag match
-                    found = True
-                    k = i
-
-                    # We then encapsulate all the stuff inside the tag
-                    # into an optional, going to the tag terminator
-                    current_start_tag = site[k]
-                    current_end_tag = "</" + site[k][1:len(site[k]) - 1] + ">"
-                    
-                    # If the optional tag includes the tag with the same name
-                    # make sure the right one is the closing tag
-                    start_tag_depth = 0
-
-                    site[k] = "[" + site[k]
-                    site_tokens.insert(k, site[k])
-                    k += 1
-
-                    print()
-                    print("site_tokens: " + site_tokens[i])
-                    print("site: " + site[k])
-                    print()
-
-                    # We loop trough the tokens and while we haven't reached
-                    # the ending tag, we continue simply adding the tags in
-                    while current_end_tag not in site[k] or start_tag_depth != 0:
-                        
-                        # Increase the nested tag occurence number
-                        if site[k] == current_start_tag:
-                            start_tag_depth += 1
-
-                        # Decrease the nested tag occurence number
-                        elif site[k] == current_end_tag:
-                            start_tag_depth -= 1
-
-
-                        site_tokens.insert(k, site[k])
-                        k += 1
-
-                    site[k] = site[k] + "]?"
-                    site_tokens.insert(k, site[k])
-                    k += 1
-
-                    i = k
-                    break
-                
-
-    	# If not found ,seach for optionals on wrapper
-        if not found:
-            for j in range(i, i+5):
-                if site[i] == site_tokens[j]:
+                    # Add tags with optional decorators
                     for k in range(i, j):
-                        site.insert(k, "[" + site_tokens[k] + "]?")
+                        node1.insert(k, node2[k])
+                        
+                        if isinstance(node1[k], bs4.element.Tag):
+                            node1[k]['roadrunner_optional'] = '?'
 
-        # Otherwise assume the optional is on the side of the TODO (??)
+                    # Move the index to the element after the
+                    # end of the optional decorator
+                    i = j
 
-    return site_tokens, site, i
+                    break
+            
+        # String mismatch
+        elif isinstance(node1[i], NavigableString) and isinstance(node2[i], NavigableString) and node1[i].string != node2[i].string:
+            node1[i] = "#PCDATA"
 
-
-def handle_lists(site_tokens, site, i, tag, element_tag):
-
-    # Tag of a list (goofy variable name though, whoops)
-    start_tag_li = "<" + tag + ">"
-    end_tag_li = "</" + tag + ">"
-    
-    # Tag of an element of the list
-    start_tag_el = "<" + element_tag + ">"
-    end_tag_el = "</" + element_tag + ">"
-
-    # In case it's nested (i.e. there's tags with the same name inside
-    # this element), check the depth
-    tag_depth = 0
-
-    # Check if previous closing tag is the ending tag of a list element
-    if end_tag_el in site_tokens[i - 1]:
-
-        # Move back a space
-        i -= 1
-
-        # Go back to the very start of the list and be careful about
-        # tag depth
-        while start_tag_li not in site_tokens[i] or tag_depth != 0:
-
-            if end_tag_li in site_tokens[i]:
-                tag_depth += 1
-            elif start_tag_li in site_tokens[i]:
-                tag_depth -= 1
-
-            i -= 1
-        
-        # Move forward a space from the start token
-        i += 2
-
-        # Start an optional at the beginning of the list element
-        site_tokens[i] = "[" + start_tag_el
-        
-        # Search for the end of said element, similarly as before
-        while end_tag_el not in site_tokens[i] or tag_depth != 0:
-
-            if site_tokens[i] == end_tag_li:
-                tag_depth += 1
-            elif site_tokens[i] == start_tag_li:
-                tag_depth -= 1
-
-            i += 1
-        
-        # End the list element tag
-        site_tokens[i] = end_tag_el + "]+"
+        # Otherwise the elements are matching, continue to the next element
         i += 1
 
-        # Remove all the other elements of the site
-        while end_tag_li not in site_tokens[i]:
-            site_tokens.pop(i)
+    # Remove all previous elements and add elements from list
+    for child in list(node1i.children):
+        # If the child is a Tag typr, use decompose()
+        if isinstance(child, Tag):
+            child.decompose()
+        # If the child is NavigableString, use extract()
+        elif isinstance(child, NavigableString):
+            child.extract()
 
-        # Remove all the other elements of the list
-        # on the second website
-        while end_tag_li not in site[i]:
-            site.pop(i)
+    for node in node1:
+        node1i.append(node)
 
-    return site_tokens, site, i
+    return node1i
+
+def count_list_elements(element_list):
+    
+    element_count = 0
+
+    for child in element_list:
+        # TODO - finish this so that it'll work for tables too
+        if isinstance(child, Tag) and child.name == "li":
+            element_count += 1
+
+    return element_count
+
+def filter_non_li(element_list):
+    return [el for el in element_list if isinstance(el, Tag) and el.name == "li"]
+
+def iterator_matching(node1i, node2i):
+
+    # First check how many children nodes each node has, if they differ, assume
+    # that all the list items are the same
+
+    node1 = list(node1i.children)
+    node2 = list(node2i.children)
+
+    # Remove whitespace elements which seemed to occur
+    node1 = [copy.copy(el) for el in node1 if isinstance(el, Tag) or (isinstance(el, NavigableString) and not el.isspace())]
+    node2 = [copy.copy(el) for el in node2 if isinstance(el, Tag) or (isinstance(el, NavigableString) and not el.isspace())]
+
+    n1_len = count_list_elements(node1)
+    n2_len = count_list_elements(node2)
+
+    nodes_return = []
+
+    if n1_len != n2_len:
+
+        # If the element count is not the same, assume the elements are equal
+        # and make them + optionals
+        if n1_len > 0 and n2_len > 0:
+            nodes_return.append(recursive_matching(node1[0], node2[0]))
+            nodes_return[0]['roadrunner_optional'] = '+'
+
+        # If there's no elements in first table, bring in an element from second table
+        # as * optional
+        elif n1_len == 0:
+            nodes_return = node2
+            for i in range(0, len(nodes_return)):
+                nodes_return[i]['roadrunner_optional'] = '*'
+
+        # If there's no elements in second table, bring in an element from first table
+        # as * optional
+        elif n2_len == 0:
+            nodes_return = node1
+            for i in range(0, len(nodes_return)):
+                nodes_return[i]['roadrunner_optional'] = '*'
+
+    # Otherwise compare each list element in one list to the
+    # corresponding element in the other list
+    else:
+        node1 = filter_non_li(node1)
+        node2 = filter_non_li(node2)
+        
+        for i in range(0, len(node1)):
+            nodes_return.append(recursive_matching(node1[i], node2[i]))
+
+    # Remove all previous elements and add elements from list
+    for child in list(node1i.children):
+        # If the child is a Tag typr, use decompose()
+        if isinstance(child, Tag):
+            child.decompose()
+        # If the child is NavigableString, use extract()
+        elif isinstance(child, NavigableString):
+            child.extract()
+
+    for node in nodes_return:
+        node1i.append(node)
+
+    return node1i
 
 
 
 """
-Run the roadrunner trough apropriate webpages
+Run the roadrunner trough given webpages
 """
 
-# Roadrunner testing
-#"""
-f = codecs.open("../input-extraction/testing/test1.html", 'r')
-site1 = parse(f.read())
-f = codecs.open("../input-extraction/testing/test2.html", 'r')
-site2 = parse(f.read())
-#"""
+# Removing the unnecessary head informaion
+def filter_html(soup):
 
-# Roadrunner for overstock.com
-"""
-f = codecs.open("../input-extraction/overstock.com/jewelry01.html", 'r')
-site1 = parse(f.read())
-f = codecs.open("../input-extraction/overstock.com/jewelry02.html", 'r')
-site2 = parse(f.read())
-#"""
+    # Remove head tag
+    for head in soup.find_all("head"): 
+        head.decompose()
 
-# Roadrunner for rtvslo.si
-"""
-f = codecs.open("../input-extraction/rtvslo.si/Audi A6 50 TDI quattro_ nemir v premijskem razredu - RTVSLO.si.html", 'r')
-site1 = parse(f.read())
-f = codecs.open("../input-extraction/rtvslo.si/Volvo XC 40 D4 AWD momentum_ suvereno med najboljs╠îe v razredu - RTVSLO.si.html", 'r')
-site2 = parse(f.read())
-#"""
+    # Remove script tags
+    for script in soup.find_all("script"): 
+        script.decompose()
 
-# Roadrunner for mimovrste.com
-"""
-f = codecs.open("../input-extraction/mimovrste.com/Entrek pohodne treking palice, karbonske, 3-delne, 66-135 cm, črne _ mimovrste=).html", 'r', encoding="utf8")
-site1 = parse(f.read())
-f = codecs.open("../input-extraction/mimovrste.com/JBL T600BTNC brezžične slušalke _ mimovrste=).html", 'r', encoding="utf8")
-site2 = parse(f.read())
-#"""
+    # Remove style tags
+    for style in soup.find_all("style"): 
+        style.decompose()
 
-sites = [site2]
-tokens = match(site1, sites)
+    return soup
 
-f = codecs.open("temp.html", 'w')
-f.write(''.join(tokens))
-f.close()
+def site_roadrunner(site):
+
+    dir_name = "../input-extraction/" + site
+
+    pages = []
+    for _, _, files in os.walk(dir_name):
+        pages = [item for item in files if item != ".DS_Store"]
+        break # Only take the current folder
+
+    print("---------------------------------------------------------------------")
+    print("Pages to make wrappers with: ", pages)
+    print("---------------------------------------------------------------------")
+    print()
+
+    # Convert all the pages into BeautifulSoup trees
+    bs_pages = []
+    page_encodings = ['utf-8', 'ansi', 'ascii']
+    for page in pages:
+        # TODO - if charset is present in file oblige it (overstock.com doesn't have it though)
+        page_html = try_reading_with_encoding(dir_name, page, page_encodings)
+
+        # If no encoding worked, return
+        if page_html == None:
+            print("################## ERROR CREATING WRAPPER FOR SITE ##################")
+            return
+
+        # Add the page to the list
+        bs_pages.append(filter_html(BeautifulSoup(page_html, "lxml")))
+
+    # First page is the base to build wrapper on, other pages
+    # are used to compare
+    tokens = create_wrapper(bs_pages[0], bs_pages[1:])
+
+    # Saving the wrappers into files inside roadrunner_wrappers folder
+    filename = "./roadrunner_wrappers/" + site + ".html"
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    f = open(filename, 'w', encoding="utf-8")
+    f.write(tokens.prettify())
+    f.close()
+
+def try_reading_with_encoding(dir_name, page, encodings):
+
+    # If there is an encoding to try, try it
+    if len(encodings) > 0:
+
+        try:
+            # Read the page from file using first element's encoding
+            f = open(dir_name + "/" +  page, 'r', encoding=encodings[0])
+
+            # Clean up html files not formatted according to XHTML specification
+            cleaner = Cleaner(remove_unknown_tags=False, page_structure=True)
+            return cleaner.clean_html(f.read())
+
+        except:
+            # Delete first element from encoding list
+            del encodings[0]
+
+            # Try reading using another encoding
+            return try_reading_with_encoding(dir_name, page, encodings)
+
+    return None
+        
+    
+
+def run_roadrunner():
+
+    # If we specify only to make wrapper for one site, do that
+    if len(sys.argv) > 1:
+        site_roadrunner(sys.argv[1])
+    # TODO - this should be read differently, since we don't directly run this file
+
+    # Otherwise do the wrapper generation for all sites
+    else:
+        # Get all the directories that will contain pages to make wrappers for
+        directories = []
+
+        for _, dirs, _ in os.walk("../input-extraction"):
+            directories = [item for item in dirs if item != "__MACOSX"]
+            break # Only take the current folder
+
+        print("---------------------------------------------------------------------")        
+        print("Websites to make wrappers for: ", directories)
+        print("---------------------------------------------------------------------")        
+        print()
+
+        # Automatically create the wrapper(s)
+        for site in directories:
+            try:
+                site_roadrunner(site)
+            except:
+                print("################## ERROR CREATING WRAPPER FOR SITE ##################")
+                print()
+
+                if DEBUG_MODE:
+                    traceback.print_exc()
+                    print()
+
+
+# TODO - remove this, it's just for debugging purpouses
+run_roadrunner()
