@@ -1,13 +1,13 @@
 import os
-import sys
 import copy
 import traceback
 
-import bs4
 from bs4 import BeautifulSoup, Tag, NavigableString
 from lxml.html.clean import Cleaner
 
 DEBUG_MODE = True
+
+
 
 """
 Create wrapper with recurvsive tag and string matching check
@@ -21,19 +21,20 @@ def create_wrapper(site_wrapper, pages):
 
     return site_wrapper
 
+
 def recursive_matching(node1i, node2i):
 
     # Start with the first child node
     i = 0
 
     # Creating a copy of node, decoupling it from parent
-    node1 = [copy.copy(el) for el in node1i.children]
-    node2 = [copy.copy(el) for el in node2i.children]
+    node1 = [copy.copy(el) for el in node1i.children if not (isinstance(el, NavigableString) and el.string.isspace())]
+    node2 = [copy.copy(el) for el in node2i.children if not (isinstance(el, NavigableString) and el.string.isspace())]
 
     if len(node1) == 0 and len(node2) == 0:
         return node1i
 
-    # And loop trough them, adding new ones
+    # Loop trough them, adding new ones
     while i < len(node1) or i < len(node2):
 
         # If we came to the end with first page, but not with the second,
@@ -44,14 +45,14 @@ def recursive_matching(node1i, node2i):
             for j in range(i, len(node2)):
                 node1.insert(j, node2[j])
 
-                if isinstance(node1[j], bs4.element.Tag):
+                if isinstance(node1[j], Tag):
                     node1[j]['roadrunner_optional'] = '?'
 
         # If we came to the end with second page, but not with the first,
         # set tags from the first page as optionals
         elif i >= len(node2) and i < len(node1):
             for j in range(i, len(node1)):
-                if isinstance(node1[j], bs4.element.Tag):
+                if isinstance(node1[j], Tag):
                     node1[j]['roadrunner_optional'] = '?'
 
         # There is no tag mismatch, check for mismatches recursivelly
@@ -65,36 +66,94 @@ def recursive_matching(node1i, node2i):
             else:
                 node1[i] = recursive_matching(node1[i], node2[i])
 
-        # There is a tag mismatch, insert optionals
-        elif isinstance(node1[i], Tag) and isinstance(node2[i], Tag) and node1[i].name != node2[i].name:
-
-            # Do cross search (or a pseudo cross search rather)
-            # TODO - do a proper cross search
-
-            # Searching for matching tags on second page
-            for j in range(i, len(node2)):
-
-                # We have found the fitting tag, insert optionals
-                if isinstance(node2[j], Tag) and (len(node1) <= j or (node1[j].name == node2[j].name)):
-
-                    # Add tags with optional decorators
-                    for k in range(i, j):
-                        node1.insert(k, node2[k])
-                        
-                        if isinstance(node1[k], bs4.element.Tag):
-                            node1[k]['roadrunner_optional'] = '?'
-
-                    # Move the index to the element after the
-                    # end of the optional decorator
-                    i = j
-
-                    break
-            
         # String mismatch
         elif isinstance(node1[i], NavigableString) and isinstance(node2[i], NavigableString) and node1[i].string != node2[i].string:
             node1[i] = "#PCDATA"
 
-        # Otherwise the elements are matching, continue to the next element
+        # If the strings are the same, don't change them        
+        elif isinstance(node1[i], NavigableString) and isinstance(node2[i], NavigableString) and node1[i].string == node2[i].string:
+            pass
+
+        # Other type of mismatch, we use cross search checking
+        else:
+            foundMatch = False
+
+            # Do cross search
+            for j in range(i, max(len(node1), len(node2))):
+
+                # Matching tags appear on the current index
+                if j < len(node1) and j < len(node2) and isinstance(node1[j], Tag) and isinstance(node2[j], Tag) and node1[j].name == node2[j].name:
+                    l = j - i
+
+                    for k in range(i, j):
+                        if isinstance(node1[k], Tag):
+                            node1[k]['roadrunner_optional'] = '?'
+                        node2.insert(k, node1[k])
+
+                    for k in range(j, j + l):
+                        if isinstance(node2[k], Tag):
+                            node2[k]['roadrunner_optional'] = '?'
+                        node1.insert(k, node2[k])
+                    
+                    foundMatch = True
+
+                    break
+                
+                # Current tag on second page has appeared before
+                elif j < len(node2) and isinstance(node2[j], Tag) and node2[j].name in [el.name for el in node1[i:min(j, len(node1))] if isinstance(el, Tag)]:
+                    foundIndex = i
+                    
+                    while not isinstance(node1[foundIndex], Tag) or node2[j].name != node1[foundIndex].name:
+                        foundIndex += 1
+
+                    for k in range(i, foundIndex):
+                        if isinstance(node1[k], Tag):
+                            node1[k]['roadrunner_optional'] = '?'
+                        node2.insert(k, node1[k])
+
+                    for k in range(foundIndex, foundIndex + (j - i)):
+                        if isinstance(node2[k], Tag):
+                            node2[k]['roadrunner_optional'] = '?'
+                        node1.insert(k, node2[k])
+
+                    foundMatch = True
+                    
+                    break
+
+                # Current tag on first page has appeared before
+                elif j < len(node1) and isinstance(node1[j], Tag) and node1[j].name in [el.name for el in node2[i:min(j, len(node2))] if isinstance(el, Tag)]:
+                    foundIndex = i
+                    
+                    while not isinstance(node2[foundIndex], Tag) or node1[j].name != node2[foundIndex].name:
+                        foundIndex += 1
+
+                    for k in range(i, foundIndex):
+                        if isinstance(node2[k], Tag):
+                            node2[k]['roadrunner_optional'] = '?'
+                        node1.insert(k, node2[k])
+
+                    for k in range(foundIndex, foundIndex + (j - i)):
+                        if isinstance(node1[k], Tag):
+                            node1[k]['roadrunner_optional'] = '?'
+                        node2.insert(k, node1[k])
+
+                    foundMatch = True
+                    
+                    break
+
+            # If there were no matches in cross search, add all the remaining nodes
+            if not foundMatch:
+                for k in range(i, len(node1)):
+                    if isinstance(node1[k], Tag):
+                        node1[k]['roadrunner_optional'] = '?'
+
+                for k in range(i, len(node2)):
+                    if isinstance(node2[k], Tag):
+                        node2[k]['roadrunner_optional'] = '?'
+
+        # Otherwise the elements are matching
+
+        # Continue to the next element
         i += 1
 
     # Remove all previous elements and add elements from list
@@ -111,6 +170,7 @@ def recursive_matching(node1i, node2i):
 
     return node1i
 
+
 def count_list_elements(element_list):
     
     element_count = 0
@@ -122,8 +182,10 @@ def count_list_elements(element_list):
 
     return element_count
 
+
 def filter_non_li(element_list):
     return [el for el in element_list if isinstance(el, Tag) and el.name == "li"]
+
 
 def iterator_matching(node1i, node2i):
 
@@ -210,6 +272,7 @@ def filter_html(soup):
 
     return soup
 
+
 def site_roadrunner(site):
 
     dir_name = "../input-extraction/" + site
@@ -220,7 +283,7 @@ def site_roadrunner(site):
         break # Only take the current folder
 
     print("---------------------------------------------------------------------")
-    print("Pages to make wrappers with: ", pages)
+    print("Pages to make wrapper with: ", pages)
     print("---------------------------------------------------------------------")
     print()
 
@@ -250,6 +313,7 @@ def site_roadrunner(site):
     f.write(tokens.prettify())
     f.close()
 
+
 def try_reading_with_encoding(dir_name, page, encodings):
 
     # If there is an encoding to try, try it
@@ -273,13 +337,11 @@ def try_reading_with_encoding(dir_name, page, encodings):
     return None
         
     
-
-def run_roadrunner():
+def run_roadrunner(site=""):
 
     # If we specify only to make wrapper for one site, do that
-    if len(sys.argv) > 1:
-        site_roadrunner(sys.argv[1])
-    # TODO - this should be read differently, since we don't directly run this file
+    if site != "":
+        site_roadrunner(site)
 
     # Otherwise do the wrapper generation for all sites
     else:
@@ -309,4 +371,4 @@ def run_roadrunner():
 
 
 # TODO - remove this, it's just for debugging purpouses
-run_roadrunner()
+# run_roadrunner()
