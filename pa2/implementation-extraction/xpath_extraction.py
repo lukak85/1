@@ -187,7 +187,7 @@ def extract_mimovrste_with_xpath(filename):
     print(json.dumps(mimovrste_xpath_dictionary, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
 
-if __name__ == "__main__":
+def run_xpath():
     # rtvslo.si
     print()
     print("---------------------------------------------------------------------")
