@@ -5,7 +5,7 @@ import traceback
 
 from bs4 import BeautifulSoup, Tag, NavigableString, Comment, Doctype
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 
@@ -17,12 +17,15 @@ def create_wrapper(site_wrapper, pages):
 
     # Go trough all pages, iterativelly building a wrapper
     for page in pages:
-        site_wrapper = recursive_matching(site_wrapper, page)
+        site_wrapper, _ = recursive_matching(site_wrapper, page)
 
     return site_wrapper
 
 
 def recursive_matching(node1i, node2i):
+
+    # Defines if all the tags in the current node match
+    tags_match = True
 
     # Start with the first child node
     i = 0
@@ -32,7 +35,7 @@ def recursive_matching(node1i, node2i):
     node2 = [copy.copy(el) for el in node2i.children if not (isinstance(el, NavigableString) and el.string.isspace())]
 
     if len(node1) == 0 and len(node2) == 0:
-        return node1i
+        return node1i, tags_match
 
     # Loop trough them, adding new ones
     while i < len(node1) or i < len(node2):
@@ -40,6 +43,8 @@ def recursive_matching(node1i, node2i):
         # If we came to the end with first page, but not with the second,
         # add tags from the second page as optionals
         if i >= len(node1) and i < len(node2):
+
+            tags_match = False
 
             # We just add the remaining items, and anotate them as optionals
             for j in range(i, len(node2)):
@@ -51,6 +56,8 @@ def recursive_matching(node1i, node2i):
         # If we came to the end with second page, but not with the first,
         # set tags from the first page as optionals
         elif i >= len(node2) and i < len(node1):
+
+            tags_match = False
 
             for j in range(i, len(node1)):
                 if isinstance(node1[j], Tag):
@@ -73,7 +80,8 @@ def recursive_matching(node1i, node2i):
 
             # Else do regular tag mismatching
             else:
-                node1[i] = recursive_matching(node1[i], node2[i])
+                node1[i], tagm = recursive_matching(node1[i], node2[i])
+                tags_match = tagm and tags_match
 
         # String mismatch
         elif isinstance(node1[i], NavigableString) and isinstance(node2[i], NavigableString) and node1[i].string != node2[i].string:
@@ -86,6 +94,7 @@ def recursive_matching(node1i, node2i):
         # Other type of mismatch, we use cross search checking
         else:
             foundMatch = False
+            tags_match = False
 
             # Do cross search
             for j in range(i, max(len(node1), len(node2))):
@@ -186,7 +195,7 @@ def recursive_matching(node1i, node2i):
     for node in node1:
         node1i.append(node)
 
-    return node1i
+    return node1i, tags_match
 
 def tags_class_id_match(tag1, tag2):
     class_match = False
@@ -246,12 +255,59 @@ def iterator_matching(node1i, node2i, el):
 
     nodes_return = []
 
-    if n1_len != n2_len:
+    # If both lists have an equal ammount of elements
+    if n1_len == n2_len:
+        node1 = filter_non_elements(node1, el)
+        node2 = filter_non_elements(node2, el)
+        
+        for i in range(0, len(node1)):
+            tag, _ = recursive_matching(node1[i], node2[i])
+            nodes_return.append(tag)
 
-        # If the element count is not the same, assume the elements are equal
-        # and make them + optionals
-        if n1_len > 0 and n2_len > 0:
-            nodes_return.append(recursive_matching(node1[0], node2[0]))
+    # Otherwise they're not
+    else:
+
+        if DEBUG_MODE:
+            print(node1[0])
+            print()
+            print(node2[0])
+            print()
+            print(recursive_matching(copy.copy(node1[n1_len - 1]), copy.copy(node1[n1_len - 2]))[1])
+            print()
+            print()
+
+        # Check if the current element and the previous one are the same - square matching
+        # If they're not, insert an '?' optional
+        if n1_len > n2_len and not recursive_matching(copy.copy(node1[n1_len - 1]), copy.copy(node1[n1_len - 2]))[1]:
+
+            # Go trough all the elements comparing them
+            for k in range(0, n2_len):
+                tag, _ = recursive_matching(copy.copy(node1[k]), copy.copy(node2[k]))
+                nodes_return.append(tag)
+
+            # Then add all the remaining elements from the second page
+            for k in range(n2_len, n1_len):
+                nodes_return.append(node1[k])
+                nodes_return[k]['roadrunner_optional'] = '?'
+
+        
+        elif n1_len < n2_len and not recursive_matching(copy.copy(node2[n2_len - 1]), copy.copy(node2[n2_len - 2]))[1]:
+
+            # Go trough all the elements comparing them
+            for k in range(0, n2_len):
+                tag, _ = recursive_matching(copy.copy(node1[k]), copy.copy(node2[k]))
+                nodes_return.append(tag)
+
+            # Then add all the remaining elements from the second page
+            for k in range(n1_len, n2_len):
+                nodes_return.append(node2[k])
+                nodes_return[k]['roadrunner_optional'] = '?'
+
+
+        # Otherwise the elements are the same; insert as '*' or '+' optional
+        elif n1_len > 0 and n2_len > 0:
+            tag, _ = recursive_matching(node1[0], node2[0])
+            nodes_return.append(tag)
             nodes_return[0]['roadrunner_optional'] = '+'
 
         # If there's no elements in first table, bring in an element from second table
@@ -261,7 +317,8 @@ def iterator_matching(node1i, node2i, el):
                 nodes_return = node2
                 nodes_return[0]['roadrunner_optional'] = '*'
             else:
-                nodes_return.append(recursive_matching(node2[0], node2[1]))
+                tag, _ = recursive_matching(node2[0], node2[1])
+                nodes_return.append(tag)
                 nodes_return[i]['roadrunner_optional'] = '*'
 
         # If there's no elements in second table, bring in an element from first table
@@ -271,18 +328,9 @@ def iterator_matching(node1i, node2i, el):
                 nodes_return = node1
                 nodes_return[0]['roadrunner_optional'] = '*'
             else:
-                nodes_return.append(recursive_matching(node1[0], node1[1]))
+                tag, _ = recursive_matching(node1[0], node1[1])
+                nodes_return.append(tag)
                 nodes_return[i]['roadrunner_optional'] = '*'
-
-
-    # Otherwise compare each list element in one list to the
-    # corresponding element in the other list
-    else:
-        node1 = filter_non_elements(node1, el)
-        node2 = filter_non_elements(node2, el)
-        
-        for i in range(0, len(node1)):
-            nodes_return.append(recursive_matching(node1[i], node2[i]))
 
     # Remove all previous elements and add elements from list
     for child in list(node1i.children):
