@@ -20,7 +20,7 @@ pip install -r requirements.txt
 To run the extractor, you are given three options:
 * __A__: extraction using regular expressions
 * __B__: extraction using XPath
-* __C__: extraction using RoadRunner
+* __C__: extraction using RoadRunner (note that our method only generates a wrapper, which can then be used to implement an extractor)
 
 To run the extractor, open the command line prompt inside [implementation-extraction](/pa2/implementation-extraction/) and run the following command:
 
@@ -28,6 +28,6 @@ To run the extractor, open the command line prompt inside [implementation-extrac
 py run-extraction.py A --site [site]
 ```
 
-Note that the command above runs the extractor using method _A_; to run using methods _B_ and _C_, use the respective letters.
-
-Using the `--site` tag, you can tell the extractor to only run the method on the site specified.
+Note:
+* The command above runs the extractor using method _A_; to run using methods _B_ and _C_, use the respective letters.
+* Using the `--site` tag you can tell the extractor to only run the method on the site specified (e.g. `rtvslo.si`).

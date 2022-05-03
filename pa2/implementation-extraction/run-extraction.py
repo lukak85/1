@@ -8,7 +8,7 @@ elif sys.argv[1] == "B":
     print("XPath extraction")
 elif sys.argv[1] == "C":
     print("Automatic Web extraction")
-    if sys.argv[2] == "--site":
+    if len(sys.argv) > 3 and sys.argv[2] == "--site":
         run_roadrunner(sys.argv[3])
     else:
         run_roadrunner()

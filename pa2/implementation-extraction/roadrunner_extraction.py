@@ -1,9 +1,9 @@
+from asyncore import loop
 import os
 import copy
 import traceback
 
-from bs4 import BeautifulSoup, Tag, NavigableString
-from lxml.html.clean import Cleaner
+from bs4 import BeautifulSoup, Tag, NavigableString, Comment, Doctype
 
 DEBUG_MODE = True
 
@@ -41,7 +41,7 @@ def recursive_matching(node1i, node2i):
         # add tags from the second page as optionals
         if i >= len(node1) and i < len(node2):
 
-            # We just add the remainint items, and anotate them as optionals
+            # We just add the remaining items, and anotate them as optionals
             for j in range(i, len(node2)):
                 node1.insert(j, node2[j])
 
@@ -51,16 +51,25 @@ def recursive_matching(node1i, node2i):
         # If we came to the end with second page, but not with the first,
         # set tags from the first page as optionals
         elif i >= len(node2) and i < len(node1):
+
             for j in range(i, len(node1)):
                 if isinstance(node1[j], Tag):
                     node1[j]['roadrunner_optional'] = '?'
 
         # There is no tag mismatch, check for mismatches recursivelly
-        elif isinstance(node1[i], Tag) and isinstance(node2[i], Tag) and node1[i].name == node2[i].name:
+        elif isinstance(node1[i], Tag) and isinstance(node2[i], Tag) and node1[i].name == node2[i].name and tags_class_id_match(node1[i], node2[i]):
 
             # If current tag is of type ul, ol or td, do iterator tag mismatching
             if node1[i].name == "ol" or node1[i].name == "ul" or node1[i].name == "thead" or node1[i].name == "tbody" or node1[i].name == "tfoot":
-                node1[i] = iterator_matching(node1[i], node2[i])
+
+                # List element is in either ordered or unordered list
+                el = "li"
+
+                # List element is in table
+                if node1[i].name == "thead" or node1[i].name == "tbody" or node1[i].name == "tfoot":
+                    el = "tr"
+                
+                node1[i] = iterator_matching(node1[i], node2[i], el)
 
             # Else do regular tag mismatching
             else:
@@ -82,28 +91,29 @@ def recursive_matching(node1i, node2i):
             for j in range(i, max(len(node1), len(node2))):
 
                 # Matching tags appear on the current index
-                if j < len(node1) and j < len(node2) and isinstance(node1[j], Tag) and isinstance(node2[j], Tag) and node1[j].name == node2[j].name:
+                if j < len(node1) and j < len(node2) and isinstance(node1[j], Tag) and isinstance(node2[j], Tag) and node1[j].name == node2[j].name and tags_class_id_match(node1[j], node2[j]):
                     l = j - i
 
                     for k in range(i, j):
+                        if isinstance(node2[k], Tag):
+                            node2[k]['roadrunner_optional'] = '?'
+                        node1.insert(k, node2[k])
+
+                    for k in range(j, j + l):
                         if isinstance(node1[k], Tag):
                             node1[k]['roadrunner_optional'] = '?'
                         node2.insert(k, node1[k])
 
-                    for k in range(j, j + l):
-                        if isinstance(node2[k], Tag):
-                            node2[k]['roadrunner_optional'] = '?'
-                        node1.insert(k, node2[k])
-                    
                     foundMatch = True
+                    i = j + l
 
                     break
                 
                 # Current tag on second page has appeared before
-                elif j < len(node2) and isinstance(node2[j], Tag) and node2[j].name in [el.name for el in node1[i:min(j, len(node1))] if isinstance(el, Tag)]:
+                elif j < len(node2) and isinstance(node2[j], Tag) and node2[j].name in [el.name for el in node1[i:min(j, len(node1))] if isinstance(el, Tag)] and any([tags_class_id_match(el, node2[j]) for el in node1[i:min(j, len(node1))] if isinstance(el, Tag)]):
                     foundIndex = i
                     
-                    while not isinstance(node1[foundIndex], Tag) or node2[j].name != node1[foundIndex].name:
+                    while not isinstance(node1[foundIndex], Tag) or node2[j].name != node1[foundIndex].name and not tags_class_id_match(node1[j], node2[foundIndex]):
                         foundIndex += 1
 
                     for k in range(i, foundIndex):
@@ -117,14 +127,15 @@ def recursive_matching(node1i, node2i):
                         node1.insert(k, node2[k])
 
                     foundMatch = True
+                    i = foundIndex + (j - i)
                     
                     break
 
                 # Current tag on first page has appeared before
-                elif j < len(node1) and isinstance(node1[j], Tag) and node1[j].name in [el.name for el in node2[i:min(j, len(node2))] if isinstance(el, Tag)]:
+                elif j < len(node1) and isinstance(node1[j], Tag) and node1[j].name in [el.name for el in node2[i:min(j, len(node2))] if isinstance(el, Tag)] and any([tags_class_id_match(el, node1[j]) for el in node2[i:min(j, len(node2))] if isinstance(el, Tag)]):
                     foundIndex = i
                     
-                    while not isinstance(node2[foundIndex], Tag) or node1[j].name != node2[foundIndex].name:
+                    while not isinstance(node2[foundIndex], Tag) or node1[j].name != node2[foundIndex].name and not tags_class_id_match(node1[j], node2[foundIndex]):
                         foundIndex += 1
 
                     for k in range(i, foundIndex):
@@ -138,18 +149,25 @@ def recursive_matching(node1i, node2i):
                         node2.insert(k, node1[k])
 
                     foundMatch = True
+                    i = foundIndex + (j - i)
                     
                     break
 
             # If there were no matches in cross search, add all the remaining nodes
             if not foundMatch:
-                for k in range(i, len(node1)):
+                ln1 = len(node1)
+
+                for k in range(i, ln1):
                     if isinstance(node1[k], Tag):
                         node1[k]['roadrunner_optional'] = '?'
+                        node2.insert(k, node1[k])
 
-                for k in range(i, len(node2)):
+                ln2 = len(node2)
+
+                for k in range(ln1, ln2):
                     if isinstance(node2[k], Tag):
                         node2[k]['roadrunner_optional'] = '?'
+                        node1.insert(k ,node2[k])
 
         # Otherwise the elements are matching
 
@@ -170,24 +188,48 @@ def recursive_matching(node1i, node2i):
 
     return node1i
 
+def tags_class_id_match(tag1, tag2):
+    class_match = False
+    id_match = False
 
-def count_list_elements(element_list):
+    # If classes are matching, assume it's the same tag
+    if tag1.has_attr('class') and tag2.has_attr('class'):
+        
+        # If neither tag has a class present, but has a class attrbute,
+        # we assume they're equal
+        if len(tag1['class']) == 0 and len(tag2['class']) == 0:
+            class_match = True
+
+        # Sometimes, the first tag by itself determines the content type,
+        # so we use this approach instead of expecting all classes to match
+        if len(tag1['class']) > 0 and len(tag2['class']) > 0:
+            class_match = tag1['class'][0] == tag2['class'][0]
+
+    # If ids are matching, assume it's the same tag
+    elif tag1.has_attr('id') and tag2.has_attr('id'):
+        id_match = tag1['id'] == tag2['id']
+
+    # If neither tag has class or id attribute, assume it's the same tag
+    elif not tag1.has_attr('class') and not tag2.has_attr('class') and not tag1.has_attr('id') and not tag2.has_attr('id'):
+        return True
+
+    return class_match or id_match
+
+def count_elements(element_list, el):
     
     element_count = 0
 
     for child in element_list:
-        # TODO - finish this so that it'll work for tables too
-        if isinstance(child, Tag) and child.name == "li":
+        if isinstance(child, Tag) and child.name == el:
             element_count += 1
 
     return element_count
 
+def filter_non_elements(element_list, le):
+    return [el for el in element_list if isinstance(el, Tag) and el.name == le]
 
-def filter_non_li(element_list):
-    return [el for el in element_list if isinstance(el, Tag) and el.name == "li"]
 
-
-def iterator_matching(node1i, node2i):
+def iterator_matching(node1i, node2i, el):
 
     # First check how many children nodes each node has, if they differ, assume
     # that all the list items are the same
@@ -199,8 +241,8 @@ def iterator_matching(node1i, node2i):
     node1 = [copy.copy(el) for el in node1 if isinstance(el, Tag) or (isinstance(el, NavigableString) and not el.isspace())]
     node2 = [copy.copy(el) for el in node2 if isinstance(el, Tag) or (isinstance(el, NavigableString) and not el.isspace())]
 
-    n1_len = count_list_elements(node1)
-    n2_len = count_list_elements(node2)
+    n1_len = count_elements(node1, el)
+    n2_len = count_elements(node2, el)
 
     nodes_return = []
 
@@ -215,22 +257,29 @@ def iterator_matching(node1i, node2i):
         # If there's no elements in first table, bring in an element from second table
         # as * optional
         elif n1_len == 0:
-            nodes_return = node2
-            for i in range(0, len(nodes_return)):
+            if n2_len == 1:
+                nodes_return = node2
+                nodes_return[0]['roadrunner_optional'] = '*'
+            else:
+                nodes_return.append(recursive_matching(node2[0], node2[1]))
                 nodes_return[i]['roadrunner_optional'] = '*'
 
         # If there's no elements in second table, bring in an element from first table
         # as * optional
         elif n2_len == 0:
-            nodes_return = node1
-            for i in range(0, len(nodes_return)):
+            if n1_len == 1:
+                nodes_return = node1
+                nodes_return[0]['roadrunner_optional'] = '*'
+            else:
+                nodes_return.append(recursive_matching(node1[0], node1[1]))
                 nodes_return[i]['roadrunner_optional'] = '*'
+
 
     # Otherwise compare each list element in one list to the
     # corresponding element in the other list
     else:
-        node1 = filter_non_li(node1)
-        node2 = filter_non_li(node2)
+        node1 = filter_non_elements(node1, el)
+        node2 = filter_non_elements(node2, el)
         
         for i in range(0, len(node1)):
             nodes_return.append(recursive_matching(node1[i], node2[i]))
@@ -259,16 +308,52 @@ Run the roadrunner trough given webpages
 def filter_html(soup):
 
     # Remove head tag
-    for head in soup.find_all("head"): 
+    for head in soup.find_all("head"):
         head.decompose()
 
     # Remove script tags
     for script in soup.find_all("script"): 
         script.decompose()
 
+    # Remove noscript tags
+    for noscript in soup.find_all("noscript"): 
+        noscript.decompose()
+
     # Remove style tags
     for style in soup.find_all("style"): 
         style.decompose()
+
+    # Remove comments
+    for comment in soup.find_all(string=lambda text: isinstance(text, Comment)): 
+        comment.extract()
+
+    # Remove doctype
+    for comment in soup.find_all(string=lambda text: isinstance(text, Doctype)): 
+        comment.extract()
+
+    # Remove images and svgs
+    for svg in soup.find_all("svg"): 
+        svg.decompose()
+    for img in soup.find_all("img"): 
+        img.extract()
+
+    # Removing all tag attributes but id and class
+    for tag in soup.find_all(True):
+        class_attr = None
+        id_attr = None
+
+        if tag.has_attr('class'):
+            class_attr = tag['class']
+
+        if tag.has_attr('id'):
+            id_attr = tag['id']
+
+        tag.attrs = {}
+
+        if class_attr != None:
+            tag.attrs['class'] = class_attr
+        if id_attr != None:
+            tag.attrs['id'] = id_attr
 
     return soup
 
@@ -289,9 +374,8 @@ def site_roadrunner(site):
 
     # Convert all the pages into BeautifulSoup trees
     bs_pages = []
-    page_encodings = ['utf-8', 'ansi', 'ascii']
+    page_encodings = ['utf-8', 'ansi', 'ascii', 'latin']
     for page in pages:
-        # TODO - if charset is present in file oblige it (overstock.com doesn't have it though)
         page_html = try_reading_with_encoding(dir_name, page, page_encodings)
 
         # If no encoding worked, return
@@ -299,7 +383,7 @@ def site_roadrunner(site):
             print("################## ERROR CREATING WRAPPER FOR SITE ##################")
             return
 
-        # Add the page to the list
+        # Add the page to the list, convert to LXML format
         bs_pages.append(filter_html(BeautifulSoup(page_html, "lxml")))
 
     # First page is the base to build wrapper on, other pages
@@ -323,9 +407,7 @@ def try_reading_with_encoding(dir_name, page, encodings):
             # Read the page from file using first element's encoding
             f = open(dir_name + "/" +  page, 'r', encoding=encodings[0])
 
-            # Clean up html files not formatted according to XHTML specification
-            cleaner = Cleaner(remove_unknown_tags=False, page_structure=True)
-            return cleaner.clean_html(f.read())
+            return f.read()
 
         except:
             # Delete first element from encoding list
@@ -368,7 +450,3 @@ def run_roadrunner(site=""):
                 if DEBUG_MODE:
                     traceback.print_exc()
                     print()
-
-
-# TODO - remove this, it's just for debugging purpouses
-# run_roadrunner()
