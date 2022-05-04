@@ -52,7 +52,7 @@ def extract_rtvslo_with_xpath(filename, output):
     # dictionary with extracted values
     rtvslo_xpath_dictionary = {
         "Author": rtvslo_author[0],
-        "Publish time": rtvslo_publish_time_1,
+        "PublishTime": rtvslo_publish_time_1,
         "Title": rtvslo_title[0],
         "Subtitle": rtvslo_subtitle[0],
         "Lead": rtvslo_lead[0],
@@ -127,10 +127,10 @@ def extract_overstock_with_xpath(filename, output):
         overstock_xpath_dictionary = {
             "Title": overstock_title,
             "Content": overstock_content_1,
-            "List price": overstock_list_price,
+            "ListPrice": overstock_list_price,
             "Price": overstock_price,
             "Saving": overstock_saving_n,
-            "Saving percent": overstock_saving_p
+            "SavingPercent": overstock_saving_p
         }
 
         # append to the list
@@ -187,9 +187,9 @@ def extract_mimovrste_with_xpath(filename, output):
     mimovrste_xpath_dictionary = {
         "Title": mimovrste_title,
         "Price": mimovrste_price,
-        "Item number": mimovrste_item_number,
-        "Number of ratings": mimovrste_number_of_reviews,
-        "Rating": mimovrste_rating_p
+        "Number": mimovrste_item_number,
+        "ReviewNumber": mimovrste_number_of_reviews,
+        "RatingPercent": mimovrste_rating_p
     }
 
     #  save to output folder
