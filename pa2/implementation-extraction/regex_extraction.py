@@ -3,7 +3,7 @@ import json
 
 # output = extracted data in JSON format
 # extracted using a single regex
-def extract_overstock(html_content):
+def extract_overstock(html_content, output):
     # od 280. vrstice naprej je prvi artikel
     data = []
 
@@ -37,6 +37,9 @@ def extract_overstock(html_content):
             })
     # print(data)
 
+    with open("../output-extraction/regex/" + output, 'w') as json_file:
+        json.dump(data, json_file, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False)
+
     print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
     # po 15 jih je
@@ -48,7 +51,7 @@ def extract_overstock(html_content):
 
 
 
-def extract_rtvslo(html_content):
+def extract_rtvslo(html_content, output):
     data = []
     # <div class="author-timestamp"> \n <strong>Miha Merljak</strong>
     # <div class="publish-meta"> \n 28. december 2018 ob 08:51<br> Ljubljana		 - 		MMC RTV SLO			</div>
@@ -84,6 +87,9 @@ def extract_rtvslo(html_content):
 
     data.append({"Author": authorD, "PublishedTime": publishedTimeD, "Title": titleD, "Subtitle": subtitleD, "Lead": leadD, "Content": contentD})
     # print(data)
+    with open("../output-extraction/regex/" + output, 'w') as json_file:
+        json.dump(data, json_file, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False)
+
     print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
 
@@ -101,7 +107,7 @@ def removeTags(text):
     nov = nov.replace('<figure class="mceNonEditable', '')
     return nov
 
-def extract_mimovrste(html_content):
+def extract_mimovrste(html_content, output):
     data = []
 
     title = """<title>(.*)\|\s+(?=mimovrste=\)</title>)"""
@@ -131,6 +137,10 @@ def extract_mimovrste(html_content):
 
     data.append({"Title": titleD, "Price": priceD, "RatingPercent": ratingPercentD, "Number":  numberD, "ReviewNumber": reviewNumberD})
     # print(data)
+
+    with open("../output-extraction/regex/" + output, 'w') as json_file:
+        json.dump(data, json_file, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False)
+
     print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
 
@@ -144,13 +154,13 @@ def run_regex():
     print("* * * * * 1st rtvslo.si page * * * * *")
     f = open("../input-extraction/rtvslo.si/Volvo XC 40 D4 AWD momentum_ suvereno med najboljs╠îe v razredu - RTVSLO.si.html", "r")
     a = f.read()
-    extract_rtvslo(a)
+    extract_rtvslo(a, "rtvslo1.json")
     f.close()
     #
     print("* * * * * 2nd rtvslo.si page * * * * *")
     ff = open("../input-extraction/rtvslo.si/Audi A6 50 TDI quattro_ nemir v premijskem razredu - RTVSLO.si.html", "r")
     aa = ff.read()
-    extract_rtvslo(aa)
+    extract_rtvslo(aa, "rtvslo2.json")
     ff.close()
 
     # OVERSTOCK
@@ -161,12 +171,12 @@ def run_regex():
     print("* * * * * 1st overstock.com page * * * * *")
     g = open("../input-extraction/overstock.com/jewelry01.html", 'r', encoding='latin')
     b = g.read()
-    extract_overstock(b)
+    extract_overstock(b, "overstock1.json")
     g.close()
     print("* * * * * 2nd overstock.com page * * * * *")
     gg = open("../input-extraction/overstock.com/jewelry02.html", "r", encoding="latin-1")
     bb = gg.read()
-    extract_overstock(bb)
+    extract_overstock(bb, "overstock2.json")
     gg.close()
 
     # MIMOVRSTE
@@ -178,11 +188,11 @@ def run_regex():
     print("* * * * * 1st mimovrste.com page * * * * *")
     h = open("../input-extraction/mimovrste.com/Entrek pohodne treking palice, karbonske, 3-delne, 66-135 cm, črne _ mimovrste=).html", "r")
     c = h.read()
-    extract_mimovrste(c)
+    extract_mimovrste(c, "mimovrste1.json")
     h.close()
 
     print("* * * * * 2nd mimovrste.com page * * * * *")
     i = open("../input-extraction/mimovrste.com/JBL T600BTNC brezžične slušalke _ mimovrste=).html", "r")
     cc = i.read()
-    extract_mimovrste(cc)
+    extract_mimovrste(cc, "mimovrste2.json")
     i.close()
