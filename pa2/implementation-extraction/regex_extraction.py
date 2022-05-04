@@ -134,7 +134,7 @@ def extract_mimovrste(html_content):
     print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
 
-def runRegex():
+def run_regex():
 
     # RTV SLO
     print()
