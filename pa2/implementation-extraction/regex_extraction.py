@@ -35,7 +35,9 @@ def extract_overstock(html_content):
                 "SavingPercent": savingPercents[i].group(1),
                 "Content": cont
             })
-    print(data)
+    # print(data)
+
+    print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
     # po 15 jih je
     #<b>List Price:</b></td><td align="left" nowrap="nowrap"><s>$149.00</s></td>
@@ -81,7 +83,8 @@ def extract_rtvslo(html_content):
     # print(type(contentD))
 
     data.append({"Author": authorD, "PublishedTime": publishedTimeD, "Title": titleD, "Subtitle": subtitleD, "Lead": leadD, "Content": contentD})
-    print(data)
+    # print(data)
+    print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
 
 def removeTags(text):
@@ -127,39 +130,58 @@ def extract_mimovrste(html_content):
     reviewNumberD = reviewNumberD.replace(' ', '')
 
     data.append({"Title": titleD, "Price": priceD, "RatingPercent": ratingPercentD, "Number":  numberD, "ReviewNumber": reviewNumberD})
-    print(data)
+    # print(data)
+    print(json.dumps(data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
 
-if __name__ == "__main__":
+def runRegex():
 
     # RTV SLO
+    print()
+    print("---------------------------------------------------------------------")
+    print("Extracting data with Regex from rtvslo.si")
+    print("---------------------------------------------------------------------")
+    print("* * * * * 1st rtvslo.si page * * * * *")
     f = open("../input-extraction/rtvslo.si/Volvo XC 40 D4 AWD momentum_ suvereno med najboljs╠îe v razredu - RTVSLO.si.html", "r")
     a = f.read()
     extract_rtvslo(a)
     f.close()
     #
+    print("* * * * * 2nd rtvslo.si page * * * * *")
     ff = open("../input-extraction/rtvslo.si/Audi A6 50 TDI quattro_ nemir v premijskem razredu - RTVSLO.si.html", "r")
     aa = ff.read()
     extract_rtvslo(aa)
     ff.close()
 
     # OVERSTOCK
+    print()
+    print("---------------------------------------------------------------------")
+    print("Extracting data with Regex from overstock.com")
+    print("---------------------------------------------------------------------")
+    print("* * * * * 1st overstock.com page * * * * *")
     g = open("../input-extraction/overstock.com/jewelry01.html", 'r', encoding='latin')
     b = g.read()
     extract_overstock(b)
     g.close()
-
+    print("* * * * * 2nd overstock.com page * * * * *")
     gg = open("../input-extraction/overstock.com/jewelry02.html", "r", encoding="latin-1")
     bb = gg.read()
     extract_overstock(bb)
     gg.close()
 
     # MIMOVRSTE
+    print()
+    print("---------------------------------------------------------------------")
+    print("Extracting data with Regex from mimovrste.com")
+    print("---------------------------------------------------------------------")
+
+    print("* * * * * 1st mimovrste.com page * * * * *")
     h = open("../input-extraction/mimovrste.com/Entrek pohodne treking palice, karbonske, 3-delne, 66-135 cm, črne _ mimovrste=).html", "r")
     c = h.read()
     extract_mimovrste(c)
     h.close()
 
+    print("* * * * * 2nd mimovrste.com page * * * * *")
     i = open("../input-extraction/mimovrste.com/JBL T600BTNC brezžične slušalke _ mimovrste=).html", "r")
     cc = i.read()
     extract_mimovrste(cc)
