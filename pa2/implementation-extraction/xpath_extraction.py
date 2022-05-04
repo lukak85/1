@@ -1,4 +1,5 @@
 import json
+import pickle
 import re
 from lxml import html
 
@@ -7,7 +8,7 @@ from lxml import html
 """
 
 
-def extract_rtvslo_with_xpath(filename):
+def extract_rtvslo_with_xpath(filename, output):
     # one data record per sample page
 
     html_content = open(filename, 'r', encoding="utf-8").read()
@@ -58,6 +59,10 @@ def extract_rtvslo_with_xpath(filename):
         "Content": rtvslo_content_1
     }
 
+    # save to output file
+    with open("../output-extraction/xpath/" + output, 'w') as json_file:
+        json.dump(rtvslo_xpath_dictionary, json_file, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False)
+
     # pretty-printing json
     print(json.dumps(rtvslo_xpath_dictionary, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
@@ -67,7 +72,7 @@ def extract_rtvslo_with_xpath(filename):
 """
 
 
-def extract_overstock_with_xpath(filename):
+def extract_overstock_with_xpath(filename, output):
     # a list of data records
 
     html_content_overstock = open(filename, 'r', encoding="latin-1").read()
@@ -131,6 +136,10 @@ def extract_overstock_with_xpath(filename):
         # append to the list
         overstock_xpath_dictionary_data.append(overstock_xpath_dictionary)
 
+    #  save to output folder
+    with open("../output-extraction/xpath/" + output, 'w') as json_file:
+        json.dump(overstock_xpath_dictionary_data, json_file, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False)
+
 
     # pretty-printing json
     print(json.dumps(overstock_xpath_dictionary_data, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
@@ -141,7 +150,7 @@ def extract_overstock_with_xpath(filename):
 """
 
 
-def extract_mimovrste_with_xpath(filename):
+def extract_mimovrste_with_xpath(filename, output):
     html_content_mimovrste = open(filename, 'r', encoding="utf-8").read()
     html_content_mimovrste = html.fromstring(html_content_mimovrste)
     # print(html_content_overstock)
@@ -183,6 +192,11 @@ def extract_mimovrste_with_xpath(filename):
         "Rating": mimovrste_rating_p
     }
 
+    #  save to output folder
+    with open("../output-extraction/xpath/" + output, 'w') as json_file:
+        json.dump(mimovrste_xpath_dictionary, json_file, indent=3, sort_keys=False, separators=(', ', ' : '),
+                  ensure_ascii=False)
+
     # pretty-printing json
     print(json.dumps(mimovrste_xpath_dictionary, indent=3, sort_keys=False, separators=(', ', ' : '), ensure_ascii=False))
 
@@ -198,13 +212,13 @@ def run_xpath():
     print()
     print("* * * * * 1st rtvslo.si page * * * * *")
     print()
-    extract_rtvslo_with_xpath(rtvslo1_filename)
+    extract_rtvslo_with_xpath(rtvslo1_filename, "rtvslo1.json")
 
     rtvslo2_filename = "../input-extraction/rtvslo.si/Volvo XC 40 D4 AWD momentum_ suvereno med najboljs╠îe v razredu - RTVSLO.si.html"
     print()
     print("* * * * * 2nd rtvslo.si page * * * * *")
     print()
-    extract_rtvslo_with_xpath(rtvslo2_filename)
+    extract_rtvslo_with_xpath(rtvslo2_filename, "rtvslo2.json")
 
     # overstock.com
     print()
@@ -216,13 +230,13 @@ def run_xpath():
     print()
     print("* * * * * 1st overstock.com page * * * * *")
     print()
-    extract_overstock_with_xpath(overstock1_filename)
+    extract_overstock_with_xpath(overstock1_filename, "overstock1.json")
 
     overstock2_filename = "../input-extraction/overstock.com/jewelry02.html"
     print()
     print("* * * * * 2nd overstock.com page * * * * *")
     print()
-    extract_overstock_with_xpath(overstock2_filename)
+    extract_overstock_with_xpath(overstock2_filename, "overstock2.json")
 
     # mimovrste.com
     print()
@@ -234,10 +248,10 @@ def run_xpath():
     print()
     print("* * * * * 1st mimovrste.com page * * * * *")
     print()
-    extract_mimovrste_with_xpath(mimovrste1_filename)
+    extract_mimovrste_with_xpath(mimovrste1_filename, "mimovrste1.json")
 
     mimovrste2_filename = "../input-extraction/mimovrste.com/JBL T600BTNC brezžične slušalke _ mimovrste=).html"
     print()
     print("* * * * * 2nd mimovrste.com page * * * * *")
     print()
-    extract_mimovrste_with_xpath(mimovrste2_filename)
+    extract_mimovrste_with_xpath(mimovrste2_filename, "mimovrste2.json")
