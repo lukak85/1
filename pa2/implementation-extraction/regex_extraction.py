@@ -74,7 +74,7 @@ def extract_rtvslo(html_content, output):
     leadD = re.findall(lead, html_content)
     contentD = re.findall(content, html_content)
 
-    contentD = removeTags(contentD)
+    contentD = removeTags(contentD[0])
 
     # v stringe
     authorD = ' '.join(authorD)
@@ -84,6 +84,7 @@ def extract_rtvslo(html_content, output):
     leadD = ' '.join(leadD)
     contentD = ''.join(str(e) for e in contentD)
     # print(type(contentD))
+
 
     data.append({"Author": authorD, "PublishedTime": publishedTimeD, "Title": titleD, "Subtitle": subtitleD, "Lead": leadD, "Content": contentD})
     # print(data)
@@ -100,10 +101,15 @@ def removeTags(text):
     clean = re.compile('<.*?>')
     nov = (' '.join(str(e) for e in text))
     nov = re.sub(clean, '', nov)
-    nov = nov.replace('\\n', ' ')
-    nov = nov.replace('\\t', '')
+    # nov = nov.split()
+    nov = nov.replace('\n', ' ')
+    nov = nov.replace('\t', '')
     nov = nov.replace('class="Body">', '')
     nov = nov.replace('>', '')
+    nov = nov.replace('  ', '')
+    nov = nov.replace(',  ', '')
+    nov = nov.replace('(', '')
+    nov = nov.replace(')', '')
     nov = nov.replace('<figure class="mceNonEditable', '')
     return nov
 
