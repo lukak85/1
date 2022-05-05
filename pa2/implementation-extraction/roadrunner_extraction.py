@@ -440,7 +440,7 @@ def site_roadrunner(site):
     tokens = create_wrapper(bs_pages[0], bs_pages[1:])
 
     # Saving the wrappers into files inside roadrunner_wrappers folder
-    filename = "./roadrunner_wrappers/" + site + ".html"
+    filename = "../output-extraction/roadrunner/wrappers/" + site + ".html"
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     f = open(filename, 'w', encoding="utf-8")
     f.write(tokens.prettify())
