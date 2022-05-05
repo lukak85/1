@@ -290,7 +290,8 @@ def iterator_matching(node1i, node2i, el):
                 nodes_return.append(node1[k])
                 nodes_return[k]['roadrunner_optional'] = '?'
 
-        
+
+        # Same but for the other page        
         elif n1_len < n2_len and not recursive_matching(copy.copy(node2[n2_len - 1]), copy.copy(node2[n2_len - 2]))[1]:
 
             # Go trough all the elements comparing them
