@@ -27,9 +27,7 @@ To run the extractor, you are given three options:
 To run the extractor, open the command line prompt inside [implementation-extraction](/pa2/implementation-extraction/) and run the following command:
 
 ```bash
-py run-extraction.py A --site [site]
+py run-extraction.py A
 ```
 
-Note:
-* The command above runs the extractor using method _A_; to run using methods _B_ and _C_, use the respective letters.
-* Using the `--site` tag you can tell the extractor to only run the method on the site specified (e.g. `rtvslo.si`).
+Note that the command above runs the extractor using method _A_; to run using methods _B_ and _C_, use the respective letters.
