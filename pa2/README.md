@@ -1,9 +1,10 @@
 # s.pyderman Data Extractor
 
-__TODO__ - write an introduction
+A web data extraction system is a software system that automatically and repeatedly extracts data from web pages with changing content and delivers the extracted data to a database or some other application.
+
 
 Explanation of each method;
-* __extraction using regular expressions__: TODO
+* __extraction using regular expressions__: using this method, we take HTML code as input and extract data using regular expressions. The extracted values are further processed where needed using regular expressions and other string methods.
 * __extraction using XPath__: using this method, we take HTML code as input and extract data using XPath expressions. The extracted values are further processed where needed using regular expressions and other string methods.
 * __extraction using RoadRunner__: using this method, we automatically generate a wrapper (using a website page batch) with which we can extract data from said website. In our implementation, the website first has to be converted to an XHTML compliant format. The result is then converted into a tree, which we use to compare the content of the websites and with it iteretively build the wrapper.
 
