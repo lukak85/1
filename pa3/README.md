@@ -1,12 +1,10 @@
 # s.pyderman indexer
 
-TODO
+A web indexer is a progam that extracts data from webpages and organizes said data to be able to achieve very quick responses to data retrieval queries.
 
 For data retrieval, we use two approaches:
-* without SQLite
-* with SQLite
-
-TODO finish the README.
+* without SQLite or
+* with SQLite.
 
 # Prerequisites
 
@@ -30,9 +28,8 @@ For data retrieval without SQLite, use the following command:
 py run-basic-search.py
 ```
 
-For a faster data retrieval using SQLite using the data obtained with the indexer, use the the following command:
+For a much faster data retrieval using SQLite using the data obtained with the indexer, use the the following command:
 
 ```bash
 py run-sqlite-search.py
 ```
-
