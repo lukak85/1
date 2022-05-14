@@ -59,4 +59,8 @@ for page in pages:
     print(f"\tHits: {page[1]}\n\t\tDoc: '{page[0]}'\n\t\tIndexes: {page[2]}")
 
 end_time = time.time()
-print("Search time: %s seconds ---" % (time.time() - start_time))
+
+print()
+print("----------------------------------------------------")
+print("Search time: %s seconds" % (time.time() - start_time))
+print("----------------------------------------------------")

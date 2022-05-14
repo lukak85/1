@@ -33,4 +33,8 @@ for row in cursor:
 conn.close()
 
 end_time = time.time()
-print("Search time: %s seconds ---" % (time.time() - start_time))
+
+print()
+print("----------------------------------------------------")
+print("Search time: %s seconds" % (time.time() - start_time))
+print("----------------------------------------------------")
