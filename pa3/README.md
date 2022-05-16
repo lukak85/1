@@ -33,3 +33,13 @@ For a much faster data retrieval using SQLite using the data obtained with the i
 ```bash
 py run-sqlite-search.py
 ```
+
+## Running using Flask
+
+We also decided to implement a pseudo search engine using Flask. To run the server which will run the search engine. open the command line in [poogle](/pa3/poogle/) folder and run the following command:
+
+```bash
+py poogle.py
+```
+
+Then visit `localhost:5000` on your browser of choice and start using the search engine.

@@ -1,0 +1,17 @@
+<!doctype html>
+
+<head>
+    <title>Poogle</title>
+    <meta charset=utf-8>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <h1>Poogle</h1>
+    <form action="/search/" method="post">
+        <input type="text" name="query" />
+        <input type="submit" value="Search" />
+    </form>
+
+</body>

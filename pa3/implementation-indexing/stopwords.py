@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 import nltk
 nltk.download('punkt')
+nltk.download('stopwords')
 from nltk.corpus import stopwords
 
 stop_words_slovene = set(stopwords.words("slovene")).union(set(

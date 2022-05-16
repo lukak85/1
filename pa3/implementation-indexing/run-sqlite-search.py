@@ -32,8 +32,6 @@ for row in cursor:
 # You should close the connection when stopped using the database.
 conn.close()
 
-end_time = time.time()
-
 print()
 print("----------------------------------------------------")
 print("Search time: %s seconds" % (time.time() - start_time))
