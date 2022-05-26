@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 
 import os
 import string
-from stopwords import stop_words_slovene
+from stopwords import stop_words_slovene, other_tokens
 
 DEBUG_MODE = False
 
@@ -62,8 +62,8 @@ for root, _, files in os.walk("../data"):
             # Tokenizing text
             page_tokens = word_tokenize(lowercase_text)
 
-            # Removing stopwords
-            filtered_tokens = [token for token in page_tokens if token not in stop_words_slovene and token not in string.punctuation]
+            # Removing stopwords, punctuations and some other tokens
+            filtered_tokens = [token for token in page_tokens if token not in stop_words_slovene and token not in string.punctuation and token not in other_tokens]
 
             checked_tokens = []
 

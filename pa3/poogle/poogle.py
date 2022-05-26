@@ -1,7 +1,9 @@
+from ntpath import join
 import sqlite3
 from flask import Flask, render_template, send_from_directory, request
 app = Flask(__name__, template_folder='static')
 from bs4 import BeautifulSoup
+from nltk.tokenize import word_tokenize
 
 import time
 
@@ -61,38 +63,36 @@ def my_link():
             title = soup.find('title').string
             display_text = ""
 
+            tokens = word_tokenize(soup.text)
+            tokensl = word_tokenize(soup.text.lower())
             for argument in at:
 
                 # Find all the occurences of the value
-                lval = soup.text.find(argument)
+                try:
+                    ind = tokensl.index(argument)
+                except:
+                    continue
 
-                # TODO - do this nicer
-                # Try with capitalising the letter
-                if lval < 0:
-                    argument = argument.capitalize()
-                    lval = soup.text.find(argument)
-                # Try with capitalising all letters
-                if lval < 0:
-                    argument = argument.upper()
-                    lval = soup.text.find(argument)
+                snippet = []
+                if ind - 3 <= 0:
+                    snippet.extend(tokens[max(0, ind - 3):ind])
+                else:
+                    if len(snippet) == 0 or snippet[len(snippet) - 1] != "...":
+                        snippet.append("...")
+                    snippet.extend(tokens[ind - 3: ind])
 
-                if lval >= 0:
-                    val = lval
-                    NO_T = 50
+                snippet.append("<b>" + tokens[ind] + "</b>")
 
-                    print(soup.text[val:val + len(argument)])
-
-                    if val - NO_T < 0:
-                        display_text += soup.text[:val] + "<b>" + soup.text[val:val + len(argument)] + "</b>" + soup.text[val + len(argument): val + NO_T] + "..."
-                    elif val + NO_T > len(soup.text):
-                        display_text += "..." + soup.text[val - NO_T:val] + "<b>" + soup.text[val:val + len(argument)] + "</b>" + soup.text[val + len(argument):]
-                    else:
-                        display_text = "..." + soup.text[val - NO_T:val] + "<b>" + soup.text[val:val + len(argument)] + "</b>" + soup.text[val + len(argument): val + NO_T] +  "..."
+                if ind + 4 >= len(tokens):
+                    snippet.extend(tokens[ind:min(ind + 4, len(tokens))])
+                else:
+                    snippet.extend(tokens[ind + 1:ind + 4])
+                    snippet.append("...")
             
             html += """
                     <tr class='box'>
                         <td><a href='""" + page_link + """'>""" + title + """</a><i>""" + page_link + """</i> (""" + str(row[1]) + """ hits)</td>
-                        <td>""" + display_text + """</td>
+                        <td>""" + ' '.join(snippet) + """</td>
                     </tr>
                     """
 

@@ -8,10 +8,11 @@ import string
 from stopwords import stop_words_slovene
 
 DEBUG_MODE = False
+MAX_SNIPPET = 3
 
 
 
-arguments = sys.argv[1:]
+arguments = [argument.lower() for argument in sys.argv[1:]]
 pages = []
 
 start_time = time.time()
@@ -42,21 +43,41 @@ for root, _, files in os.walk("../data"):
 
             frequency = 0
             indexes = []
+            snippet = []
+            snippet_count = 0
+
             # Search for the tokens
             for i in range(0, len(filtered_tokens)):
+
+                if snippet_count == MAX_SNIPPET:
+                    break
+
                 if filtered_tokens[i] in arguments:
                     indexes.append(i)
+
+                    if i - 3 <= 0:
+                        snippet.extend(filtered_tokens[max(0, i-3):i])
+                    else:
+                        if len(snippet) == 0 or snippet[len(snippet) - 1] != "...":
+                            snippet.append("...")
+                        snippet.extend(filtered_tokens[i - 3: i])
+
+                    if i + 4 >= len(filtered_tokens):
+                        snippet.extend(filtered_tokens[i:min(i+4, len(filtered_tokens))])
+                    else:
+                        snippet.extend(filtered_tokens[i:i+4])
+                        snippet.append("...")
 
             frequency += len(indexes)
 
             if frequency > 0:
-                pages.append((current_path, frequency, indexes))
+                pages.append((current_path, frequency, indexes, snippet))
 
 # Sort pages retrieved in descending order
 pages.sort(key=lambda x: x[1], reverse=True)
 
 for page in pages:
-    print(f"\tHits: {page[1]}\n\t\tDoc: '{page[0]}'\n\t\tIndexes: {page[2]}")
+    print(f"\tHits: {page[1]}\n\t\tDoc: '{page[0]}'\n\t\tIndexes: {page[2]}\n\t\tSnippet: {' '.join(page[3])}")
 
 print()
 print("----------------------------------------------------")
