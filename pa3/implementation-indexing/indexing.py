@@ -1,10 +1,13 @@
 import sqlite3
+from matplotlib.pyplot import table
 
 from nltk.tokenize import word_tokenize
 from bs4 import BeautifulSoup
 
 import os
 import string
+import traceback
+
 from stopwords import stop_words_slovene, other_tokens
 
 DEBUG_MODE = False
@@ -77,28 +80,36 @@ for root, _, files in os.walk("../data"):
                 indexes = []
                 for i in range(0, len(filtered_tokens)):
                     if token == filtered_tokens[i]:
-                        indexes.append(i)
+                        indexes.append(str(i))
 
                 # Try adding the word; it may already have been added though
                 try:
                     c = conn.cursor()
 
-                    c.execute('''
+                    query = """
                         INSERT INTO IndexWord VALUES
-                            (''' + '\'' + token + '\'' + ''');
-                    ''')
+                            (?);
+                    """
+                    c.execute(query, (
+                        token,
+                    ))
                 except:
                     if DEBUG_MODE:
                         print("Word \'" + token + "\' already exists in the database")
 
                 try:
-                    c.execute('''
-                        INSERT INTO Posting VALUES 
-                            (''' + '\'' + token + '\'' + ''', ''' + '\'' + current_path + '\'' + ''', ''' + str(len(indexes)) + ''', ''' + '\'' + str(indexes) + '\'' + ''');
-                    ''')
-                except:
-                    if DEBUG_MODE:
-                        print("Idk what could have gone wrong yet")
+                    query = """
+                        INSERT INTO Posting
+                        VALUES (?, ?, ?, ?);
+                    """
+                    c.execute(query, (
+                        token,
+                        current_path,
+                        len(indexes),
+                        ", ".join(indexes),
+                    ))
+                except Exception:
+                    traceback.print_exc()
 
                 # Save (commit) the changes
                 conn.commit()

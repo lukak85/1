@@ -62,37 +62,54 @@ def my_link():
             soup = BeautifulSoup(f.read(), 'lxml')
             title = soup.find('title').string
             display_text = ""
-
-            tokens = word_tokenize(soup.text)
-            tokensl = word_tokenize(soup.text.lower())
+            st = soup.text
             for argument in at:
 
                 # Find all the occurences of the value
-                try:
-                    ind = tokensl.index(argument)
-                except:
-                    continue
+                lval = st.find(argument)
 
-                snippet = []
-                if ind - 3 <= 0:
-                    snippet.extend(tokens[max(0, ind - 3):ind])
-                else:
-                    if len(snippet) == 0 or snippet[len(snippet) - 1] != "...":
-                        snippet.append("...")
-                    snippet.extend(tokens[ind - 3: ind])
+                # TODO - do this nicer
+                # Try with capitalising the letter
+                if lval < 0:
+                    argument = argument.capitalize()
+                    lval = st.find(argument)
+                # Try with capitalising all letters
+                if lval < 0:
+                    argument = argument.upper()
+                    lval = st.find(argument)
 
-                snippet.append("<b>" + tokens[ind] + "</b>")
+                if lval >= 0:
+                    val = lval
+                    WORD_NO = 3
 
-                if ind + 4 >= len(tokens):
-                    snippet.extend(tokens[ind:min(ind + 4, len(tokens))])
-                else:
-                    snippet.extend(tokens[ind + 1:ind + 4])
-                    snippet.append("...")
+                    # This is for counting how many words on each side of our word we print out
+                    # (which we count using number of whitespaces), and where the said spaces appear
+                    bottomInd = val - 1
+                    bottomWords = 0
+                    topInd = val + len(argument) + 2
+                    topWords = 0
+                    
+                    while bottomWords < WORD_NO and bottomInd > 0:
+                        bottomInd -= 1
+                        if st[bottomInd] == " ":
+                            bottomWords += 1
+
+                    while topWords < WORD_NO and topInd < len(st):
+                        if st[topInd] == " ":
+                            topWords += 1
+                        topInd += 1
+
+                    if bottomInd == 0:
+                        display_text += st[:val] + "<b>" + st[val:val + len(argument)] + "</b>" + st[val + len(argument):topInd] + "..."
+                    elif topInd == len(st):
+                        display_text += "..." + st[bottomInd:val] + "<b>" + st[val:val + len(argument)] + "</b>" + st[val + len(argument):]
+                    else:
+                        display_text = "..." + st[bottomInd:val] + "<b>" + st[val:val + len(argument)] + "</b>" + st[val + len(argument):topInd] +  "..."
             
             html += """
                     <tr class='box'>
                         <td><a href='""" + page_link + """'>""" + title + """</a><i>""" + page_link + """</i> (""" + str(row[1]) + """ hits)</td>
-                        <td>""" + ' '.join(snippet) + """</td>
+                        <td>""" + display_text + """</td>
                     </tr>
                     """
 

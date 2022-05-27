@@ -4,7 +4,9 @@ conn = sqlite3.connect('inverted-index.db')
 import sys
 import time
 
-MAX_SNIPPET = 3
+MAX_SNIPPET = 1
+MAX_PAGES = 5
+GET_SNIPPET = True
 
 
 
@@ -53,27 +55,35 @@ for row in cursor:
     pages.append(row)
 
 # Go trough all the hits and get their snippets
+pi = 0
 for row in pages:
 
     snippet = []
-    indexes = row[2].replace("[", "").replace("]", "").split(", ")
+    indexes = row[2].split(",")
 
-    for i in range(min(len(indexes), MAX_SNIPPET)):
-        ci = int(indexes[i])
+    if GET_SNIPPET:
 
-        if len(snippet) == 0 or snippet[len(snippet) - 1] != "...":
+        for i in range(min(len(indexes), MAX_SNIPPET)):
+            ci = int(indexes[i])
+
+            if len(snippet) == 0 or snippet[len(snippet) - 1] != "...":
+                if ci - MAX_SNIPPET > 0:
+                    snippet.append("...")
+            
+            for j in range(ci - 3, ci + 4):
+                if j == ci:
+                    snippet.append(row[3])
+                else:
+                    snippet_word = get_snippet(j, c)
+                    if snippet_word != "":
+                        snippet.append(snippet_word)
+
             snippet.append("...")
-        
-        for j in range(ci - 3, ci + 4):
-            if j == ci:
-                snippet.append(row[3])
-            else:
-                snippet_word = get_snippet(j, c)
-                if snippet_word != "":
-                    snippet.append(snippet_word)
 
-        snippet.append("...")
+        if pi == MAX_PAGES:
+            break
 
+        pi += 1
 
     print(f"\tHits: {row[1]}\n\t\tDoc: '{row[0]}'\n\t\tIndexes: {row[2]}\n\t\tSnippet: '{' '.join(snippet)}'")
 # You should close the connection when stopped using the database.
